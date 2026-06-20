@@ -24,11 +24,11 @@ what's actually on air.
 | **PTZ Preset** | Go to the chosen server preset (or Home) | — |
 | **CamStreamer Stream** | Start / stop a stream | Shows **“Starting…”** while connecting, then a solid red tally dot while live |
 | **CamOverlay Widget** | Show / hide a CamOverlay Custom Graphic | Key lit while the widget is visible |
-| **CamSwitcher Source** | Switch to a CamSwitcher view | Solid red tally dot on the active (on-air) view |
-| **Buy Me a Coffee** | Opens the project's Ko-fi page | — |
+| **CamSwitcher Source** | Switch to a CamSwitcher view | Key highlighted on the active view (no red dot) |
 
-The red **tally dot** follows the broadcast convention: it's lit while a stream is live or a
-view is on air, so you always know your output state at a glance.
+The red **tally dot** is exclusive to **CamStreamer streams** — it follows the broadcast
+convention and is lit only while a stream is live, so you always know your output state at a
+glance. CamSwitcher's active view is shown with a solid colour highlight instead.
 
 ## Requirements
 
@@ -48,6 +48,9 @@ globally across all actions):
 - **User** / **Password** — a camera account. Digest auth is handled by the plugin; the
   credentials are stored in Stream Deck **global settings** on your machine and sent only to
   the camera.
+- **Protocol** — `HTTP (port 80)` (default) or `HTTPS — untrusted cert (port 443)`. Pick HTTPS
+  when the camera only exposes its CGIs over TLS; self-signed / untrusted certificates are
+  accepted automatically. The port follows the protocol (80 / 443) unless you set one explicitly.
 
 Then pick a preset / stream / widget / view from the dropdown. Done.
 
@@ -115,9 +118,9 @@ src/
   ui.ts                  sdpi datasource responder
   live-action.ts         base class: per-instance polling timer, repaint, "Starting…" + tally state
   actions/
-    preset.ts  stream.ts  overlay.ts  view.ts  coffee.ts
+    preset.ts  stream.ts  overlay.ts  view.ts
 com.4xsdev.axis-gateway.sdPlugin/
-  manifest.json          5 keypad actions
+  manifest.json          4 keypad actions
   bin/plugin.js          rollup output (built)
   ui/*.html              Property Inspectors (sdpi-components)
   imgs/...               icons
@@ -135,3 +138,15 @@ com.4xsdev.axis-gateway.sdPlugin/
 - Credentials live in Stream Deck **global settings** (local to your machine), and are sent
   only to the camera you configure.
 ```
+
+## Changelog
+
+- **1.0.2** — HTTPS added. A **Protocol** selector in each action's Property Inspector lets you
+  choose `HTTP (port 80)` or `HTTPS — untrusted cert (port 443)`; self-signed / untrusted
+  certificates are accepted, and the port follows the protocol unless set explicitly.
+  Preset keys now light as a radio group **per camera + view area** (Home included). The red
+  tally dot is now exclusive to CamStreamer live streams; the active CamSwitcher view shows a
+  colour highlight instead. Off keys gained a coloured edge stroke so actions stay
+  distinguishable when the deck washes the tiles out. The "Buy Me a Coffee" action was removed.
+- **1.0.0** — Initial release: PTZ presets, CamStreamer streams, CamOverlay widgets,
+  CamSwitcher sources with live key state.
