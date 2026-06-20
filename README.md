@@ -1,2 +1,137 @@
-# Stream-Deck-Axis-Cam-CamStreamer-Plugin
-A native Elgato Stream Deck plugin (modern `@elgato/streamdeck` Node SDK, TypeScript) that controls an Axis camera **directly** — no proxy, no token. The plugin talks straight to the camera's own HTTP APIs over digest authentication.
+# Axis Cam + CamStreamer — Stream Deck plugin
+
+A native Elgato Stream Deck plugin (modern `@elgato/streamdeck` Node SDK, TypeScript)
+that controls an Axis camera **directly** — the plugin talks straight to the camera's own
+HTTP APIs over digest authentication.
+
+```
+Stream Deck key ─▶ plugin (Node, in the Stream Deck app) ─HTTP digest─▶ Axis camera
+                                                                          ├─ VAPIX PTZ      (/axis-cgi/com/ptz.cgi)
+                                                                          ├─ CamStreamer    (/local/camstreamer/…)
+                                                                          ├─ CamOverlay     (/local/camoverlay/api/…)
+                                                                          └─ CamSwitcher    (/local/camswitcher/…)
+```
+
+The camera is the single source of truth. Each action's Property Inspector reads the live
+catalog from the camera (presets, streams, widgets, views) and offers a dropdown — you never
+type a CGI URL. Stream and switcher keys then poll the camera and repaint themselves to show
+what's actually on air.
+
+## Actions (all keypad — work on every Stream Deck, incl. the keys of a Stream Deck +)
+
+| Action | Tap does | Live state |
+|---|---|---|
+| **PTZ Preset** | Go to the chosen server preset (or Home) | — |
+| **CamStreamer Stream** | Start / stop a stream | Shows **“Starting…”** while connecting, then a solid red tally dot while live |
+| **CamOverlay Widget** | Show / hide a CamOverlay Custom Graphic | Key lit while the widget is visible |
+| **CamSwitcher Source** | Switch to a CamSwitcher view | Solid red tally dot on the active (on-air) view |
+| **Buy Me a Coffee** | Opens the project's Ko-fi page | — |
+
+The red **tally dot** follows the broadcast convention: it's lit while a stream is live or a
+view is on air, so you always know your output state at a glance.
+
+## Requirements
+
+- Stream Deck app **6.5+** (the plugin ships a Node 20 runtime via the manifest).
+- Network reachability to the camera (LAN, or an `https://…device-connect.net` URL off-LAN).
+- The relevant CamStreamer suite apps installed on the camera for those actions to appear
+  (CamStreamer for streams, CamOverlay for widgets, CamSwitcher for views). PTZ needs only a
+  PTZ-capable Axis camera.
+- For building: Node.js 20+ (the Elgato CLI is optional — see packaging below).
+
+## Configure
+
+Drag any action onto a key, then in its Property Inspector set (once — these are shared
+globally across all actions):
+
+- **Camera IP** — e.g. `192.168.1.156` (or your `…device-connect.net` host for remote access).
+- **User** / **Password** — a camera account. Digest auth is handled by the plugin; the
+  credentials are stored in Stream Deck **global settings** on your machine and sent only to
+  the camera.
+
+Then pick a preset / stream / widget / view from the dropdown. Done.
+
+> Optional: the camera can export a `.streamDeckProfile` with keys pre-filled. Install this
+> plugin once, double-click the profile, and the buttons are ready. Per-action settings take
+> precedence over the global ones, so baked profiles and hand-configured keys coexist.
+
+## Build & install (development)
+
+```bash
+npm install
+npm run build          # rollup -> com.4xsdev.axis-gateway.sdPlugin/bin/plugin.js
+```
+
+Sideload into Stream Deck with the Elgato CLI (if installed):
+
+```bash
+streamdeck link com.4xsdev.axis-gateway.sdPlugin
+streamdeck restart com.4xsdev.axis-gateway
+# or, while editing:
+npm run watch          # rebuilds on every change
+```
+
+## Package for distribution
+
+With the Elgato CLI:
+
+```bash
+streamdeck pack com.4xsdev.axis-gateway.sdPlugin --force
+```
+
+Or without it (plain zip of the `.sdPlugin` folder, renamed):
+
+```bash
+npm run build
+( cd com.4xsdev.axis-gateway.sdPlugin && zip -rX ../com.4xsdev.axis-gateway.streamDeckPlugin . -x '*/node_modules/*' '*.DS_Store' )
+```
+
+Double-click the resulting `com.4xsdev.axis-gateway.streamDeckPlugin` to install.
+
+## How it talks to the camera
+
+| When | Call | Purpose |
+|---|---|---|
+| Property Inspector opens | discovery reads of the product CGIs | Fill the dropdown (presets / streams / widgets / views) |
+| Every 3 s while a stateful key is visible | cheap state read | Repaint the key (live / visible / active) |
+| Key press | the matching native CGI | Execute the action |
+
+Native endpoints used:
+
+- **PTZ** — `/axis-cgi/com/ptz.cgi` (`gotoserverpresetname` / `gotoserverpresetno`, `move=home`).
+- **CamStreamer** — `/local/camstreamer/stream_list.cgi`, `set_stream_enabled.cgi`.
+- **CamOverlay** — `/local/camoverlay/api/services.cgi` (get / set).
+- **CamSwitcher** — `/local/camswitcher/playlists.cgi`, `playlist_switch.cgi`.
+
+Auth: HTTP **digest** (with Basic fallback) is implemented in `gateway.ts`, since Node's
+`fetch` can't do digest. Self-signed TLS is accepted when the camera is addressed over HTTPS.
+
+## Project layout
+
+```
+src/
+  plugin.ts              entry — registers actions, connects
+  gateway.ts             direct-to-camera HTTP client (digest) + discovery + Selection type
+  ui.ts                  sdpi datasource responder
+  live-action.ts         base class: per-instance polling timer, repaint, "Starting…" + tally state
+  actions/
+    preset.ts  stream.ts  overlay.ts  view.ts  coffee.ts
+com.4xsdev.axis-gateway.sdPlugin/
+  manifest.json          5 keypad actions
+  bin/plugin.js          rollup output (built)
+  ui/*.html              Property Inspectors (sdpi-components)
+  imgs/...               icons
+```
+
+## Notes & caveats
+
+- **sdpi-components** is loaded from its CDN (`https://sdpi-components.dev/releases/v4/…`) in
+  the PI HTML. For fully offline machines, download `sdpi-components.js` next to the HTML files
+  and change the `<script src>` to a relative path.
+- **Live-state polling** is every 3 s per visible key (`POLL_MS` in `live-action.ts`); it only
+  runs while the key is on screen (started in `onWillAppear`, cleared in `onWillDisappear`).
+- This build is **keypad-only**. Momentary/continuous PTZ and Stream Deck + dial control are
+  deliberately deferred.
+- Credentials live in Stream Deck **global settings** (local to your machine), and are sent
+  only to the camera you configure.
+```

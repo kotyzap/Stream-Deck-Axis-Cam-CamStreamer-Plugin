@@ -1,0 +1,144 @@
+{
+    "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+    "Name": "Axis Cam + CamStreamer",
+    "Version": "1.0.0.1",
+    "Author": "Pavel Kotyza",
+    "Description": "Control Axis cameras and CamStreamer apps directly: PTZ presets, CamStreamer streams, CamOverlay widgets and CamSwitcher sources — with live key state. https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin",
+    "UUID": "com.4xsdev.axis-gateway",
+    "Icon": "imgs/plugin/marketplace",
+    "Category": "Axis Cam + CamStreamer",
+    "CategoryIcon": "imgs/plugin/category",
+    "CodePath": "bin/plugin.js",
+    "SDKVersion": 2,
+    "Software": {
+        "MinimumVersion": "6.5"
+    },
+    "OS": [
+        {
+            "Platform": "mac",
+            "MinimumVersion": "12"
+        },
+        {
+            "Platform": "windows",
+            "MinimumVersion": "10"
+        }
+    ],
+    "Nodejs": {
+        "Version": "20"
+    },
+    "Actions": [
+        {
+            "Name": "PTZ Preset",
+            "UUID": "com.4xsdev.axis-gateway.preset",
+            "Icon": "imgs/actions/preset/icon",
+            "Tooltip": "Go to a PTZ preset (or Home).",
+            "Controllers": [
+                "Keypad"
+            ],
+            "PropertyInspectorPath": "ui/preset.html",
+            "SupportedInMultiActions": true,
+            "DisableAutomaticStates": true,
+            "States": [
+                {
+                    "Image": "imgs/actions/preset/key",
+                    "TitleAlignment": "middle"
+                },
+                {
+                    "Image": "imgs/actions/preset/key-on",
+                    "TitleAlignment": "middle"
+                }
+            ]
+        },
+        {
+            "Name": "CamStreamer Stream",
+            "UUID": "com.4xsdev.axis-gateway.stream",
+            "Icon": "imgs/actions/stream/icon",
+            "Tooltip": "Start or stop a CamStreamer stream. Key reflects live state.",
+            "Controllers": [
+                "Keypad"
+            ],
+            "PropertyInspectorPath": "ui/stream.html",
+            "SupportedInMultiActions": true,
+            "DisableAutomaticStates": true,
+            "States": [
+                {
+                    "Image": "imgs/actions/stream/key",
+                    "TitleAlignment": "middle"
+                },
+                {
+                    "Image": "imgs/actions/stream/key-live",
+                    "TitleAlignment": "middle"
+                },
+                {
+                    "Image": "imgs/actions/stream/key-on",
+                    "TitleAlignment": "middle"
+                }
+            ]
+        },
+        {
+            "Name": "CamOverlay Widget",
+            "UUID": "com.4xsdev.axis-gateway.overlay",
+            "Icon": "imgs/actions/overlay/icon",
+            "Tooltip": "Show or hide a CamOverlay widget. Key reflects live state.",
+            "Controllers": [
+                "Keypad"
+            ],
+            "PropertyInspectorPath": "ui/overlay.html",
+            "SupportedInMultiActions": true,
+            "DisableAutomaticStates": true,
+            "States": [
+                {
+                    "Image": "imgs/actions/overlay/key",
+                    "TitleAlignment": "middle"
+                },
+                {
+                    "Image": "imgs/actions/overlay/key-on",
+                    "TitleAlignment": "middle"
+                }
+            ]
+        },
+        {
+            "Name": "CamSwitcher Source",
+            "UUID": "com.4xsdev.axis-gateway.view",
+            "Icon": "imgs/actions/view/icon",
+            "Tooltip": "Switch to a CamSwitcher view. Key highlights when the view is active.",
+            "Controllers": [
+                "Keypad"
+            ],
+            "PropertyInspectorPath": "ui/view.html",
+            "SupportedInMultiActions": true,
+            "DisableAutomaticStates": true,
+            "States": [
+                {
+                    "Image": "imgs/actions/view/key",
+                    "TitleAlignment": "middle"
+                },
+                {
+                    "Image": "imgs/actions/view/key-live",
+                    "TitleAlignment": "middle"
+                },
+                {
+                    "Image": "imgs/actions/view/key-on",
+                    "TitleAlignment": "middle"
+                }
+            ]
+        },
+        {
+            "Name": "Buy Me a Coffee",
+            "UUID": "com.4xsdev.axis-gateway.coffee",
+            "Icon": "imgs/actions/coffee/icon",
+            "Tooltip": "Support development — opens the author's ko-fi page.",
+            "Controllers": [
+                "Keypad"
+            ],
+            "PropertyInspectorPath": "ui/coffee.html",
+            "SupportedInMultiActions": false,
+            "States": [
+                {
+                    "Image": "imgs/actions/coffee/key",
+                    "TitleAlignment": "middle"
+                }
+            ]
+        }
+    ]
+}
