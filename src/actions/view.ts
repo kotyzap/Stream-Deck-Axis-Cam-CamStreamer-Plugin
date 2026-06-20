@@ -30,12 +30,12 @@ export class ViewAction extends LiveAction {
         this.paintLive(a, !!sel?.name && sel.name === activeViewName);
     }
 
-    /** Active view = on air → solid red tally dot; others → idle. */
+    /** Active view = on air → solid highlight (key-on); others → idle. No red tally dot. */
     private paintLive(a: KeyAction<LiveSettings>, active: boolean): void {
         this.setLive(a, active);
     }
 
-    /** Repaint every visible View key so only the active one shows the live dot. */
+    /** Repaint every visible View key so only the active one is highlighted. */
     private async repaintAll(): Promise<void> {
         for (const a of this.actions) {
             if (!a.isKey()) continue;
