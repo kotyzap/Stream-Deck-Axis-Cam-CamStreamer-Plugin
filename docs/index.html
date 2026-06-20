@@ -55,7 +55,9 @@
     border-bottom: 1px solid var(--border);
   }
   .nav { display: flex; align-items: center; gap: 14px; padding: 12px 20px; max-width: var(--maxw); margin: 0 auto; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; line-height: 1.15; }
+  .logo { flex: 0 0 auto; }
+  @media (max-width: 720px) { .nav a.navlink { display: none; } }
   .logo {
     width: 34px; height: 34px; border-radius: 9px; background: var(--yellow);
     display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 20px;
@@ -163,7 +165,7 @@
 <body>
 <header>
   <nav class="nav">
-    <div class="brand"><span class="logo">A</span> Axis Cam + CamStreamer</div>
+    <div class="brand"><span class="logo">A</span> Elgato Stream Deck Plugin for Axis Cam + CamStreamer Apps</div>
     <span class="spacer"></span>
     <a class="navlink" href="#features">Features</a>
     <a class="navlink" href="#decks">Decks</a>
