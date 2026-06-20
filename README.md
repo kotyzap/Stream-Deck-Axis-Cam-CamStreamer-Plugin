@@ -4,8 +4,7 @@ A native Elgato Stream Deck plugin (modern `@elgato/streamdeck` Node SDK, TypeSc
 that controls an Axis camera **directly** — the plugin talks straight to the camera's own
 HTTP APIs over digest authentication.
 
-<img width="100%" alt="Elgato_Stream_Decks-HW" src="https://github.com/user-attachments/assets/1cf1cf04-0437-4e29-8abf-89539ef67453" />
-
+<img width="800" height="450" alt="StreamDeckAxisPlugin" src="https://github.com/user-attachments/assets/43c41a3f-ac71-4035-aefb-d7dcdeb058ce" />
 
 
 ```
