@@ -1,353 +1,411 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Axis Cam + CamStreamer Elgato Stream Deck Plugin</title>
 <meta name="description" content="Control Axis cameras directly from an Elgato Stream Deck: PTZ presets, CamStreamer streams, CamOverlay widgets and CamSwitcher sources — with a live red tally dot." />
 <link rel="canonical" href="https://kotyzap.github.io/Stream-Deck-Axis-Cam-CamStreamer-Plugin/" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --yellow: #FFCC33;
-    --yellow-deep: #E6B321;
-    --red: #FF2D2D;
-    --radius: 14px;
-    --maxw: 1080px;
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{ background:#08090b; }
+  @keyframes sdPulse{ 0%,100%{ box-shadow:0 0 0 3px rgba(255,43,43,.30), 0 0 14px rgba(255,43,43,.85); } 50%{ box-shadow:0 0 0 6px rgba(255,43,43,.10), 0 0 22px rgba(255,43,43,1); } }
+  @keyframes sdFloat{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+  [data-sd-root]{
+    --page-bg: radial-gradient(1100px 600px at 78% -10%, rgba(31,155,255,.16), transparent 60%), radial-gradient(900px 500px at 0% 8%, rgba(139,92,246,.10), transparent 55%), #08090b;
+    --header-bg: rgba(10,11,13,.72);
+    --text:#eef1f5; --text-2:#cfd5dd; --text-dim:#aab2bd; --text-mute:#9aa3b0; --text-faint:#7e8896; --text-fainter:#5e6671;
+    --hairline:#1d2026; --border:#23272f; --border-soft:#2a2e37; --border-strong:#3a4150; --row-border:#1b1e25; --chip-bg:#1c1f26;
+    --surface-solid:#16181d; --surface-2:#121419; --surface-3:#0e1014; --code-bg:#0c0e12; --accent-text:#7cc4ff;
   }
-  html[data-theme="light"] {
-    --bg: #f6f7f9;
-    --bg-elev: #ffffff;
-    --text: #1c1f24;
-    --text-dim: #5b6470;
-    --border: #e4e7ec;
-    --shadow: 0 1px 3px rgba(16,24,40,.08), 0 8px 24px rgba(16,24,40,.06);
-    --code-bg: #f0f2f5;
-    --hero: linear-gradient(135deg, #fff8e3 0%, #ffffff 60%);
+  [data-sd-root][data-sd-theme="light"]{
+    --page-bg: radial-gradient(1100px 600px at 78% -10%, rgba(31,155,255,.10), transparent 60%), radial-gradient(900px 500px at 0% 8%, rgba(139,92,246,.07), transparent 55%), #eceff4;
+    --header-bg: rgba(248,250,252,.8);
+    --text:#14171c; --text-2:#2b313b; --text-dim:#4a5360; --text-mute:#5a626f; --text-faint:#828b98; --text-fainter:#9aa2ae;
+    --hairline:#e3e6eb; --border:#e1e4ea; --border-soft:#d3d7df; --border-strong:#b9bfc9; --row-border:#eceef2; --chip-bg:#f1f3f7;
+    --surface-solid:#ffffff; --surface-2:#f4f6f9; --surface-3:#f7f9fb; --code-bg:#f3f5f8; --accent-text:#0a72e6;
   }
-  html[data-theme="dark"] {
-    --bg: #14171c;
-    --bg-elev: #1c2026;
-    --text: #e9edf2;
-    --text-dim: #9aa4b1;
-    --border: #2a2f37;
-    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 8px 28px rgba(0,0,0,.35);
-    --code-bg: #0f1216;
-    --hero: linear-gradient(135deg, #2a2410 0%, #1c2026 60%);
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
-  a { color: var(--yellow-deep); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
-
-  /* Header */
-  header {
-    position: sticky; top: 0; z-index: 10;
-    background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
-    backdrop-filter: saturate(160%) blur(10px);
-    border-bottom: 1px solid var(--border);
-  }
-  .nav { display: flex; align-items: center; gap: 14px; padding: 12px 20px; max-width: var(--maxw); margin: 0 auto; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; line-height: 1.15; }
-  .logo { flex: 0 0 auto; }
-  @media (max-width: 720px) { .nav a.navlink { display: none; } }
-  .logo {
-    width: 34px; height: 34px; border-radius: 9px; background: var(--yellow);
-    display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 20px;
-    box-shadow: var(--shadow);
-  }
-  .nav .spacer { flex: 1; }
-  .nav a.navlink { color: var(--text-dim); font-weight: 600; font-size: 14px; }
-  .nav a.navlink:hover { color: var(--text); text-decoration: none; }
-  .theme-btn {
-    border: 1px solid var(--border); background: var(--bg-elev); color: var(--text);
-    border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 13px; font-weight: 600;
-  }
-  .theme-btn:hover { border-color: var(--yellow); }
-
-  /* Hero */
-  .hero { background: var(--hero); border-bottom: 1px solid var(--border); }
-  .hero-inner { padding: 64px 0 52px; text-align: center; }
-  .badge {
-    display: inline-block; background: var(--yellow); color: #1c1f24; font-weight: 700;
-    font-size: 12px; letter-spacing: .04em; padding: 5px 12px; border-radius: 999px; text-transform: uppercase;
-  }
-  h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.1; margin: 18px 0 10px; }
-  .lead { font-size: clamp(16px, 2.4vw, 20px); color: var(--text-dim); max-width: 680px; margin: 0 auto; }
-  .cta { margin-top: 28px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  .hero-img { display: block; max-width: 460px; width: 100%; margin: 40px auto 0; filter: drop-shadow(0 24px 40px rgba(16,24,40,.25)); }
-  .works { margin-top: 22px; display: flex; align-items: center; justify-content: center; gap: 12px; }
-  .works span { color: var(--text-dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
-  .works img { height: 34px; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 10px;
-    font-weight: 700; font-size: 15px; cursor: pointer; border: 1px solid transparent;
-  }
-  .btn-primary { background: var(--yellow); color: #1c1f24; box-shadow: var(--shadow); }
-  .btn-primary:hover { background: var(--yellow-deep); text-decoration: none; }
-  .btn-ghost { background: var(--bg-elev); color: var(--text); border-color: var(--border); }
-  .btn-ghost:hover { border-color: var(--yellow); text-decoration: none; }
-
-  /* Sections */
-  section { padding: 56px 0; border-bottom: 1px solid var(--border); }
-  section h2 { font-size: clamp(22px, 3.4vw, 30px); margin: 0 0 8px; }
-  section .sub { color: var(--text-dim); margin: 0 0 32px; max-width: 640px; }
-
-  /* Feature grid */
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
-  .card {
-    background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 22px; box-shadow: var(--shadow);
-  }
-  .chip {
-    width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
-    color: #fff; font-weight: 800; font-size: 15px; margin-bottom: 12px;
-  }
-  .card h3 { margin: 0 0 6px; font-size: 17px; }
-  .card p { margin: 0; color: var(--text-dim); font-size: 14.5px; }
-
-  /* Screenshot */
-  figure { margin: 0; }
-  .shot {
-    width: 100%; border-radius: var(--radius); border: 1px solid var(--border);
-    box-shadow: var(--shadow); background: var(--bg-elev); display: block;
-  }
-  figcaption { color: var(--text-dim); font-size: 13.5px; margin-top: 10px; text-align: center; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: center; }
-  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
-
-  /* Steps */
-  ol.steps { counter-reset: step; list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
-  ol.steps li {
-    position: relative; padding: 18px 18px 18px 60px; background: var(--bg-elev);
-    border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
-  }
-  ol.steps li::before {
-    counter-increment: step; content: counter(step);
-    position: absolute; left: 16px; top: 16px; width: 30px; height: 30px;
-    background: var(--yellow); color: #1c1f24; border-radius: 8px; display: grid; place-items: center; font-weight: 800;
-  }
-  ol.steps li strong { display: block; margin-bottom: 2px; }
-  ol.steps li span { color: var(--text-dim); font-size: 14.5px; }
-  code, kbd {
-    background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
-    padding: 1px 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
-  }
-  pre {
-    background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px; overflow-x: auto; font-size: 13px; line-height: 1.5;
-  }
-  pre code { background: none; border: none; padding: 0; }
-
-  /* Tally callout */
-  .tally {
-    display: inline-flex; align-items: center; gap: 8px; background: var(--code-bg);
-    border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 14px;
-  }
-  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 25%, transparent); }
-
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  th { color: var(--text-dim); font-weight: 700; }
-  td code { font-size: 12.5px; }
-
-  footer { padding: 40px 0; text-align: center; color: var(--text-dim); font-size: 14px; }
-  .kofi { margin-top: 10px; }
+  [data-sd-root] *{ transition: background-color .25s ease, border-color .25s ease, color .2s ease, fill .2s ease; }
+  body:has([data-sd-theme="light"]){ background:#eceff4; }
+  /* theme-icon visibility */
+  .ico-moon, .ico-sun{ display:none; }
+  [data-sd-theme="dark"] .ico-moon{ display:inline-flex; }
+  [data-sd-theme="light"] .ico-sun{ display:inline-flex; }
 </style>
 </head>
 <body>
-<header>
-  <nav class="nav">
-    <div class="brand"><span class="logo">A</span> Elgato Stream Deck Plugin for Axis Cam + CamStreamer Apps</div>
-    <span class="spacer"></span>
-    <a class="navlink" href="#features">Features</a>
-    <a class="navlink" href="#decks">Decks</a>
-    <a class="navlink" href="#install">Install</a>
-    <a class="navlink" href="#setup">Setup</a>
-    <a class="navlink" href="#how">How it works</a>
-    <a class="navlink" href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin" target="_blank" rel="noopener">GitHub ↗</a>
-    <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">🌙 Dark</button>
-  </nav>
-</header>
+<div data-sd-root data-sd-theme="light" style="font-family:'Space Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--page-bg); color:var(--text); min-height:100vh; -webkit-font-smoothing:antialiased; transition:background .25s ease, color .25s ease;">
 
-<div class="hero">
-  <div class="wrap hero-inner">
-    <span class="badge">Elgato Stream Deck plugin</span>
-    <h1>Run your Axis camera live show<br>from a Stream Deck.</h1>
-    <p class="lead">Trigger PTZ presets, start and stop CamStreamer streams, toggle CamOverlay widgets and switch CamSwitcher sources — straight from your deck, with a live red tally dot so you always know what's on air.</p>
-    <div class="works"><span>Works with</span><img src="img/Cam-Streamer-Applications.png" alt="CamStreamer, CamOverlay and CamSwitcher" /></div>
-    <div class="cta">
-      <a class="btn btn-primary" href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin/releases/tag/v1.0.0.1" target="_blank" rel="noopener">⬇ Download the plugin</a>
-      <a class="btn btn-ghost" href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin" target="_blank" rel="noopener">View on GitHub</a>
+  <!-- ===== HEADER ===== -->
+  <header style="position:sticky; top:0; z-index:30; background:var(--header-bg); backdrop-filter:saturate(160%) blur(14px); border-bottom:1px solid var(--hairline);">
+    <nav style="display:flex; align-items:center; gap:18px; max-width:1160px; margin:0 auto; padding:13px 24px;">
+      <div style="display:flex; align-items:center; gap:11px; font-weight:700; font-size:15px; letter-spacing:-.01em;">
+        <span style="position:relative; width:34px; height:34px; border-radius:9px; flex:none; background:linear-gradient(160deg,#36a9ff,#0a72e6); box-shadow:inset 0 1.5px 1px rgba(255,255,255,.5), inset 0 -6px 12px rgba(0,0,0,.35), 0 4px 12px rgba(10,114,230,.45); display:flex; align-items:center; justify-content:center;" style-before="content:''; position:absolute; inset:2px 2px 52% 2px; border-radius:7px 7px 14px 14px; background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0)); pointer-events:none;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="1.6"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+        </span>
+        <span style="display:flex; flex-direction:column; line-height:1.15;"><span style="white-space:nowrap;">Axis Cam <span style="color:var(--text-faint);">+</span> CamStreamer</span><span style="font-size:11px; font-weight:500; color:var(--text-faint); letter-spacing:.02em;">Stream Deck plugin</span></span>
+      </div>
+      <span style="flex:1;"></span>
+      <a href="#features" class="navlink" style="color:var(--text-dim); font-weight:500; font-size:14px; text-decoration:none;" style-hover="color:var(--text);">Features</a>
+      <a href="#decks" class="navlink" style="color:var(--text-dim); font-weight:500; font-size:14px; text-decoration:none;" style-hover="color:var(--text);">Hardware</a>
+      <a href="#install" class="navlink" style="color:var(--text-dim); font-weight:500; font-size:14px; text-decoration:none;" style-hover="color:var(--text);">Install</a>
+      <a href="#setup" class="navlink" style="color:var(--text-dim); font-weight:500; font-size:14px; text-decoration:none;" style-hover="color:var(--text);">Setup</a>
+      <a href="#how" class="navlink" style="color:var(--text-dim); font-weight:500; font-size:14px; text-decoration:none;" style-hover="color:var(--text);">How it works</a>
+      <button id="themeToggle" aria-label="Toggle light or dark theme" style="display:inline-flex; align-items:center; gap:7px; background:var(--surface-solid); border:1px solid var(--border-soft); color:var(--text); font-weight:600; font-size:13px; padding:8px 13px; border-radius:999px; cursor:pointer; font-family:inherit;" style-hover="border-color:var(--border-strong);">
+        <span class="ico-moon" style="align-items:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
+        <span class="ico-sun" style="align-items:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>
+        <span id="themeLabel">Dark</span>
+      </button>
+      <a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin/releases/tag/v1.0.0.1" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:7px; background:linear-gradient(160deg,#36a9ff,#0a72e6); color:#fff; font-weight:600; font-size:14px; padding:9px 16px; border-radius:999px; text-decoration:none; box-shadow:0 4px 14px rgba(10,114,230,.45);" style-hover="filter:brightness(1.08);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg> Download
+      </a>
+    </nav>
+  </header>
+
+  <!-- ===== HERO ===== -->
+  <section style="max-width:1160px; margin:0 auto; padding:72px 24px 36px; display:flex; gap:56px; align-items:center; flex-wrap:wrap;">
+    <div style="flex:1 1 380px; min-width:300px;">
+      <span style="display:inline-flex; align-items:center; gap:8px; background:rgba(31,155,255,.12); border:1px solid rgba(31,155,255,.4); color:var(--accent-text); font-weight:600; font-size:12px; letter-spacing:.06em; text-transform:uppercase; padding:6px 13px; border-radius:999px;">
+        <span style="width:7px; height:7px; border-radius:50%; background:#ff2b2b; box-shadow:0 0 8px #ff2b2b;"></span> Live camera control
+      </span>
+      <h1 style="font-size:clamp(34px,5.2vw,56px); line-height:1.04; letter-spacing:-.02em; font-weight:700; margin:20px 0 16px;">Run your Axis camera<br>show from a <span style="background:linear-gradient(120deg,#36a9ff,#8b5cf6); -webkit-background-clip:text; background-clip:text; color:transparent;">Stream Deck.</span></h1>
+      <p style="font-size:clamp(16px,2vw,19px); line-height:1.6; color:var(--text-dim); max-width:560px; margin:0 0 28px;">Trigger PTZ presets, start and stop CamStreamer streams, toggle CamOverlay widgets and switch CamSwitcher sources — straight from your deck, with a live red tally dot so you always know what's on air.</p>
+      <div style="display:flex; gap:13px; flex-wrap:wrap;">
+        <a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin/releases/tag/v1.0.0.1" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; background:linear-gradient(160deg,#36a9ff,#0a72e6); color:#fff; font-weight:600; font-size:15.5px; padding:14px 26px; border-radius:12px; text-decoration:none; box-shadow:0 8px 22px rgba(10,114,230,.45);" style-hover="filter:brightness(1.08);">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg> Download the plugin
+        </a>
+        <a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; background:var(--surface-solid); color:var(--text); border:1px solid var(--border-soft); font-weight:600; font-size:15.5px; padding:14px 24px; border-radius:12px; text-decoration:none;" style-hover="border-color:var(--border-strong);">
+          <svg width="18" height="18" viewBox="0 0 24 24" style="fill:var(--text)"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.12-.31-.54-1.53.12-3.19 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.19.77.84 1.24 1.92 1.24 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg> View on GitHub
+        </a>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px; margin-top:30px;">
+        <span style="color:var(--text-faint); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.07em;">Works with</span>
+        <img src="img/Cam-Streamer-Applications.png" alt="CamStreamer, CamOverlay and CamSwitcher" style="height:34px;" />
+      </div>
     </div>
-    <img class="hero-img" src="img/Elgato-Stream-Deck-15keys.png" alt="Elgato Stream Deck with live production keys" />
-  </div>
-</div>
 
-<main>
-  <!-- FEATURES -->
-  <section id="features">
-    <div class="wrap">
-      <h2>Full control from your deck</h2>
-      <p class="sub">Each action talks directly to the camera over digest-authenticated VAPIX and product CGIs. No cloud, no middleman.</p>
-      <div class="grid">
-        <div class="card">
-          <div class="chip" style="background:#3aa757">P</div>
-          <h3>PTZ Preset</h3>
-          <p>Jump to any server preset position (or Home) on a click. Presets are read live from the camera.</p>
+    <!-- Interactive deck -->
+    <div style="flex:1 1 380px; min-width:320px; display:flex; justify-content:center;">
+      <div style="position:relative; padding:30px 30px 34px; border-radius:30px; background:linear-gradient(180deg,#23262c 0%,#101216 70%,#0a0c0f 100%); box-shadow:inset 0 2px 1px rgba(255,255,255,.10), inset 0 -20px 40px rgba(0,0,0,.55), 0 30px 60px rgba(0,0,0,.6); border:1px solid #2c303a; animation:sdFloat 6s ease-in-out infinite;">
+        <div style="display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom:22px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#cdd3db"><circle cx="12" cy="12" r="9" fill="none" stroke="#cdd3db" stroke-width="2"/><path d="M12 7v10M8 9.5 16 14.5"/></svg>
+          <span style="font-size:12px; font-weight:700; letter-spacing:.34em; color:#cdd3db;">STREAM DECK</span>
         </div>
-        <div class="card">
-          <div class="chip" style="background:#2176e9">S</div>
-          <h3>CamStreamer Stream</h3>
-          <p>Start / stop a stream to YouTube, Facebook or any target. The key shows <strong>“Starting…”</strong> while connecting, then a solid red tally dot once live.</p>
+        <div style="display:grid; grid-template-columns:repeat(3,96px); gap:18px;">
+          <!-- PTZ -->
+          <div style="position:relative; width:96px; height:96px; border-radius:18px; background:linear-gradient(160deg,#3ec06f,#1f8f4d); box-shadow:inset 0 2px 1px rgba(255,255,255,.45), inset 0 -10px 18px rgba(0,0,0,.4), 0 8px 18px rgba(0,0,0,.5); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:15px 15px 36px 36px; background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0)); pointer-events:none;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+            <span style="position:relative; font-size:10.5px; font-weight:600; color:#fff;">PTZ</span>
+          </div>
+          <!-- STREAM (interactive YT) -->
+          <div id="ytKey" style="position:relative; width:96px; height:96px; border-radius:18px; background:linear-gradient(160deg,#3a93ec,#1664cf); box-shadow:inset 0 2px 1px rgba(255,255,255,.45), inset 0 -10px 18px rgba(0,0,0,.4), 0 8px 18px rgba(0,0,0,.5); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; cursor:pointer;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:15px 15px 36px 36px; background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0)); pointer-events:none;">
+            <div id="tallyDot" style="position:absolute; top:9px; right:9px; width:20px; height:20px; border-radius:50%; background:#ff2b2b; display:flex; align-items:center; justify-content:center; animation:sdPulse 1.4s ease-in-out infinite;"></div>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="1.6"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+            <span style="position:relative; font-size:13px; font-weight:700; color:#fff; letter-spacing:.04em;">YT</span>
+          </div>
+          <!-- OVERLAY -->
+          <div style="position:relative; width:96px; height:96px; border-radius:18px; background:linear-gradient(160deg,#f0a32e,#d27e12); box-shadow:inset 0 2px 1px rgba(255,255,255,.45), inset 0 -10px 18px rgba(0,0,0,.4), 0 8px 18px rgba(0,0,0,.5); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:15px 15px 36px 36px; background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0)); pointer-events:none;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+            <span style="position:relative; font-size:10.5px; font-weight:600; color:#fff;">Overlay</span>
+          </div>
+          <!-- SWITCHER -->
+          <div style="position:relative; width:96px; height:96px; border-radius:18px; background:linear-gradient(160deg,#9b6ef5,#6f3fe0); box-shadow:inset 0 2px 1px rgba(255,255,255,.45), inset 0 -10px 18px rgba(0,0,0,.4), 0 8px 18px rgba(0,0,0,.5); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:15px 15px 36px 36px; background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0)); pointer-events:none;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/><path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/></svg>
+            <span style="position:relative; font-size:10.5px; font-weight:600; color:#fff;">Switch</span>
+          </div>
+          <!-- HOME -->
+          <div style="position:relative; width:96px; height:96px; border-radius:18px; background:linear-gradient(160deg,#3b424f,#222731); box-shadow:inset 0 2px 1px rgba(255,255,255,.25), inset 0 -10px 18px rgba(0,0,0,.45), 0 8px 18px rgba(0,0,0,.5); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:15px 15px 36px 36px; background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,0)); pointer-events:none;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dfe4ea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+            <span style="position:relative; font-size:10.5px; font-weight:600; color:#dfe4ea;">Home</span>
+          </div>
+          <!-- COFFEE -->
+          <div style="position:relative; width:96px; height:96px; border-radius:18px; background:linear-gradient(160deg,#ff6b6b,#e23b3b); box-shadow:inset 0 2px 1px rgba(255,255,255,.4), inset 0 -10px 18px rgba(0,0,0,.4), 0 8px 18px rgba(0,0,0,.5); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:15px 15px 36px 36px; background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0)); pointer-events:none;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M10 2v2M14 2v2M16 8a4 4 0 0 1 0 8h-1"/><path d="M3 8h13v4a6 6 0 0 1-6 6H9a6 6 0 0 1-6-6z"/></svg>
+            <span style="position:relative; font-size:10.5px; font-weight:600; color:#fff;">Coffee</span>
+          </div>
         </div>
-        <div class="card">
-          <div class="chip" style="background:#e69a1f">O</div>
-          <h3>CamOverlay Widget</h3>
-          <p>Show or hide a CamOverlay custom-graphics service instantly. The key reflects its current state.</p>
+        <p style="text-align:center; margin:20px 0 0; font-size:12px; color:#8a92a0;"><span id="liveCaption">On air — tap the YT key to stop the stream</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SHOWCASE BANNER ===== -->
+  <section style="max-width:1160px; margin:0 auto; padding:8px 24px 20px;">
+    <figure style="margin:0;">
+      <img src="img/Elgato_Stream_Decks-HW.jpg" alt="Stream Deck + showing the Axis Cam + CamStreamer keys — PTZ, YT live, Overlay, Switch, Home and Coffee — beside two other Stream Deck models" style="width:100%; height:auto; border-radius:20px; border:1px solid var(--border); box-shadow:0 24px 60px rgba(0,0,0,.35); display:block;" />
+      <figcaption style="color:var(--text-faint); font-size:13px; margin-top:12px; text-align:center;">The plugin's keys on a Stream Deck + — PTZ, YT (live), Overlay and Switch, with a record-style tally.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== FEATURES ===== -->
+  <section id="features" style="max-width:1160px; margin:0 auto; padding:56px 24px; border-top:1px solid var(--hairline);">
+    <h2 style="font-size:clamp(24px,3.4vw,34px); letter-spacing:-.02em; margin:0 0 10px;">Full control from your deck</h2>
+    <p style="color:var(--text-dim); font-size:16px; max-width:620px; margin:0 0 36px;">Each action talks directly to the camera over digest-authenticated VAPIX and product CGIs. No cloud, no middleman.</p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:18px;">
+
+      <div style="background:linear-gradient(180deg,var(--surface-solid),var(--surface-2)); border:1px solid var(--border); border-radius:18px; padding:24px;">
+        <div style="position:relative; width:58px; height:58px; border-radius:14px; background:linear-gradient(160deg,#3ec06f,#1f8f4d); box-shadow:inset 0 2px 1px rgba(255,255,255,.45), inset 0 -8px 14px rgba(0,0,0,.4), 0 6px 14px rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; margin-bottom:16px;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:11px 11px 28px 28px; background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0)); pointer-events:none;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
         </div>
-        <div class="card">
-          <div class="chip" style="background:#8b5cf6">V</div>
-          <h3>CamSwitcher Source</h3>
-          <p>Switch the live view between sources. The active view carries the red tally dot; the rest stay idle.</p>
-        </div>
+        <h3 style="margin:0 0 6px; font-size:17px;">PTZ Preset</h3>
+        <p style="margin:0; color:var(--text-mute); font-size:14.5px; line-height:1.55;">Jump to any server preset position (or Home) on a click. Presets are read live from the camera.</p>
       </div>
 
-      <div style="margin-top:40px" class="two">
-        <figure>
-          <img class="shot" src="img/Stream-Deck-Axis-Camera-CamStreamer-Plugin.png" alt="Axis Cam + CamStreamer actions in the Stream Deck app" style="max-width:340px;margin:0 auto" />
-          <figcaption>The actions in the Stream Deck app — drag any key onto your deck.</figcaption>
-        </figure>
-        <div>
-          <h3 style="margin-top:0">Live key state, the broadcast way</h3>
-          <p style="color:var(--text-dim)">Stream and switcher keys mirror the camera in real time. When a stream is live or a view is on air, the key lights up with a steady <span class="tally"><span class="dot"></span>red tally dot</span> — the same signal every production crew already understands.</p>
-          <div style="display:flex; gap:18px; margin-top:18px; align-items:center">
-            <figure><img class="shot" src="img/YT-OFF.png" alt="Stream key, idle" style="width:90px" /><figcaption>Idle</figcaption></figure>
-            <figure><img class="shot" src="img/YT-ON.png" alt="Stream key, live with red dot" style="width:90px" /><figcaption>Live</figcaption></figure>
+      <div style="background:linear-gradient(180deg,var(--surface-solid),var(--surface-2)); border:1px solid var(--border); border-radius:18px; padding:24px;">
+        <div style="position:relative; width:58px; height:58px; border-radius:14px; background:linear-gradient(160deg,#3a93ec,#1664cf); box-shadow:inset 0 2px 1px rgba(255,255,255,.45), inset 0 -8px 14px rgba(0,0,0,.4), 0 6px 14px rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; margin-bottom:16px;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:11px 11px 28px 28px; background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0)); pointer-events:none;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="1.6"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+        </div>
+        <h3 style="margin:0 0 6px; font-size:17px;">CamStreamer Stream</h3>
+        <p style="margin:0; color:var(--text-mute); font-size:14.5px; line-height:1.55;">Start / stop a stream to YouTube, Facebook or any target. The key shows <strong style="color:var(--text-2);">"Starting…"</strong> while connecting, then a solid red tally dot once live.</p>
+      </div>
+
+      <div style="background:linear-gradient(180deg,var(--surface-solid),var(--surface-2)); border:1px solid var(--border); border-radius:18px; padding:24px;">
+        <div style="position:relative; width:58px; height:58px; border-radius:14px; background:linear-gradient(160deg,#f0a32e,#d27e12); box-shadow:inset 0 2px 1px rgba(255,255,255,.45), inset 0 -8px 14px rgba(0,0,0,.4), 0 6px 14px rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; margin-bottom:16px;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:11px 11px 28px 28px; background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0)); pointer-events:none;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+        </div>
+        <h3 style="margin:0 0 6px; font-size:17px;">CamOverlay Widget</h3>
+        <p style="margin:0; color:var(--text-mute); font-size:14.5px; line-height:1.55;">Show or hide a CamOverlay custom-graphics service instantly. The key reflects its current state.</p>
+      </div>
+
+      <div style="background:linear-gradient(180deg,var(--surface-solid),var(--surface-2)); border:1px solid var(--border); border-radius:18px; padding:24px;">
+        <div style="position:relative; width:58px; height:58px; border-radius:14px; background:linear-gradient(160deg,#9b6ef5,#6f3fe0); box-shadow:inset 0 2px 1px rgba(255,255,255,.45), inset 0 -8px 14px rgba(0,0,0,.4), 0 6px 14px rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; margin-bottom:16px;" style-before="content:''; position:absolute; inset:3px 3px 50% 3px; border-radius:11px 11px 28px 28px; background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0)); pointer-events:none;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/><path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/></svg>
+        </div>
+        <h3 style="margin:0 0 6px; font-size:17px;">CamSwitcher Source</h3>
+        <p style="margin:0; color:var(--text-mute); font-size:14.5px; line-height:1.55;">Switch the live view between sources. The active view carries the red tally dot; the rest stay idle.</p>
+      </div>
+    </div>
+
+    <!-- action list + live state -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px; align-items:center; margin-top:44px;" class="grid-2col">
+      <figure style="margin:0; background:linear-gradient(180deg,var(--surface-solid),var(--surface-2)); border:1px solid var(--border); border-radius:18px; padding:22px; display:flex; flex-direction:column; align-items:center;">
+        <img src="img/Stream-Deck-Axis-Camera-CamStreamer-Plugin.png" alt="Axis Cam + CamStreamer actions in the Stream Deck app" style="max-width:320px; width:100%; border-radius:8px;" />
+        <figcaption style="color:var(--text-faint); font-size:13px; margin-top:14px; text-align:center;">The actions in the Stream Deck app — drag any key onto your deck.</figcaption>
+      </figure>
+      <div>
+        <h3 style="margin:0 0 10px; font-size:21px;">Live key state, the broadcast way</h3>
+        <p style="color:var(--text-mute); font-size:15px; line-height:1.6; margin:0 0 18px;">Stream and switcher keys mirror the camera in real time. When a stream is live or a view is on air, the key lights up with a steady <span style="display:inline-flex; align-items:center; gap:6px; background:var(--chip-bg); border:1px solid var(--border-soft); border-radius:999px; padding:3px 11px; font-weight:600; font-size:13px; color:var(--text);"><span style="width:10px; height:10px; border-radius:50%; background:#ff2b2b; box-shadow:0 0 0 3px rgba(255,43,43,.25);"></span>red tally dot</span> — the same signal every production crew already understands.</p>
+        <div style="display:flex; gap:16px; align-items:center;">
+          <button id="ytSwitch" aria-label="Toggle the stream on or off" style="border:0; background:transparent; padding:0; cursor:pointer; line-height:0; border-radius:14px;" style-hover="filter:brightness(1.05);">
+            <img id="ytSwitchImg" src="img/YT-OFF.png" alt="CamStreamer Stream key" style="width:104px; height:104px; display:block;" />
+          </button>
+          <div style="font-size:13.5px; line-height:1.4;">
+            <div id="ytSwitchCap" style="font-weight:600; color:var(--text-2);">Idle — tap to go live</div>
+            <div style="color:var(--text-faint); margin-top:3px;">One key, start &amp; stop</div>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- HARDWARE -->
-  <section id="decks">
-    <div class="wrap">
-      <h2>Fits every Stream Deck</h2>
-      <p class="sub">From the 6-key Mini to the 32-key XL — lay out as many camera, stream and switcher keys as your show needs.</p>
-      <div class="grid">
-        <figure><img class="shot" src="img/Elgato-Stream-Deck-06keys.png" alt="Stream Deck Mini, 6 keys" /><figcaption>Stream Deck Mini — 6 keys</figcaption></figure>
-        <figure><img class="shot" src="img/Elgato-Stream-Deck-15keys.png" alt="Stream Deck MK.2, 15 keys" /><figcaption>Stream Deck MK.2 — 15 keys</figcaption></figure>
-        <figure><img class="shot" src="img/Elgato-Stream-Deck-32keys.png" alt="Stream Deck XL, 32 keys" /><figcaption>Stream Deck XL — 32 keys</figcaption></figure>
-      </div>
-    </div>
-  </section>
-
-  <!-- INSTALL -->
-  <section id="install">
-    <div class="wrap">
-      <h2>Install</h2>
-      <p class="sub">Works with the Elgato Stream Deck app 6.5+ on macOS and Windows.</p>
-      <div class="two">
-        <ol class="steps">
-          <li><strong>Download the plugin</strong><span>Grab <code>com.4xsdev.axis-gateway.streamDeckPlugin</code> from the <a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin/releases/tag/v1.0.0.1" target="_blank" rel="noopener">v1.0.0.1 release</a>.</span></li>
-          <li><strong>Double-click to install</strong><span>The Stream Deck app opens and asks to confirm — click <strong>Install</strong>.</span></li>
-          <li><strong>Add a key</strong><span>Find <strong>Axis Cam + CamStreamer</strong> in the action list and drag a key onto your deck.</span></li>
-          <li><strong>Enter camera details</strong><span>Set the camera <code>IP</code>, <code>user</code> and <code>password</code> once — they're shared across keys.</span></li>
-        </ol>
-        <figure>
-          <img class="shot" src="img/AXIS%20Cam-CamStreamer-Plugin-Install.png" alt="Install confirmation dialog in the Stream Deck app" />
-          <figcaption>One-click install confirmation.</figcaption>
-        </figure>
-      </div>
-      <p style="margin-top:24px; color:var(--text-dim)">Prefer zero setup? The camera can export a ready-made <code>.streamDeckProfile</code> with all your presets and streams pre-filled — just open it from the shared folder.</p>
-      <figure style="margin-top:14px">
-        <img class="shot" src="img/MacOS-Plugin-Installation.png" alt="Exported .streamDeckProfile shown in a shared folder on macOS" style="max-width:520px" />
-        <figcaption>An exported profile, ready to double-click.</figcaption>
+  <!-- ===== HARDWARE ===== -->
+  <section id="decks" style="max-width:1160px; margin:0 auto; padding:56px 24px; border-top:1px solid var(--hairline);">
+    <h2 style="font-size:clamp(24px,3.4vw,34px); letter-spacing:-.02em; margin:0 0 10px;">Fits every Stream Deck</h2>
+    <p style="color:var(--text-dim); font-size:16px; max-width:620px; margin:0 0 36px;">From the 6-key Mini to the 32-key XL — lay out as many camera, stream and switcher keys as your show needs.</p>
+    <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:stretch;">
+      <figure style="margin:0; flex:1 1 300px; background:linear-gradient(180deg,var(--surface-solid),var(--surface-3)); border:1px solid var(--border); border-radius:18px; padding:14px;">
+        <img src="img/Elgato-Stream-Deck-06keys.png" alt="Stream Deck Mini, 6 keys" style="width:100%; border-radius:10px; display:block;" />
+        <figcaption style="color:var(--text-mute); font-size:13.5px; margin-top:12px; text-align:center; font-weight:500;">Stream Deck Mini — 6 keys</figcaption>
       </figure>
-    </div>
-  </section>
-
-  <!-- SETUP -->
-  <section id="setup">
-    <div class="wrap">
-      <h2>Setup examples</h2>
-      <p class="sub">Pick the action on the key, fill in the camera, then choose from the live dropdown — values are read straight from your camera.</p>
-      <div class="two">
-        <figure>
-          <img class="shot" src="img/Preset-Setup.png" alt="PTZ Preset key configuration" />
-          <figcaption>PTZ Preset — choose a server preset (here, <em>Home</em>).</figcaption>
-        </figure>
-        <figure>
-          <img class="shot" src="img/YT-setup.png" alt="CamStreamer Stream key configuration for a YouTube stream" />
-          <figcaption>CamStreamer Stream — pick the stream to start/stop (here, a YouTube target).</figcaption>
-        </figure>
+      <figure style="margin:0; flex:1 1 300px; background:linear-gradient(180deg,var(--surface-solid),var(--surface-3)); border:1px solid var(--border); border-radius:18px; padding:14px;">
+        <img src="img/Elgato-Stream-Deck-15keys.png" alt="Stream Deck MK.2, 15 keys" style="width:100%; border-radius:10px; display:block;" />
+        <figcaption style="color:var(--text-mute); font-size:13.5px; margin-top:12px; text-align:center; font-weight:500;">Stream Deck MK.2 — 15 keys</figcaption>
+      </figure>
+      <div style="flex:1 1 150px; min-width:150px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:12px; background:var(--surface-2); border:1px dashed var(--border-strong); border-radius:18px; padding:24px 18px;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+        <div style="color:var(--text-2); font-size:14.5px; font-weight:600; line-height:1.4;">…and every other<br>Stream Deck model</div>
+        <div style="color:var(--text-faint); font-size:12.5px;">XL, Neo, Pedal, Mobile &amp; more</div>
       </div>
     </div>
   </section>
 
-  <!-- HOW IT WORKS -->
-  <section id="how">
-    <div class="wrap">
-      <h2>Under the hood: direct camera control</h2>
-      <p class="sub">The plugin runs inside the Stream Deck app and talks straight to the camera's own HTTP APIs over digest authentication.</p>
-      <pre><code>Stream Deck key ──▶ plugin (Node) ──HTTP digest──▶ Axis camera
-                                                  ├─ VAPIX PTZ   /axis-cgi/com/ptz.cgi
-                                                  ├─ CamStreamer /local/camstreamer/…
-                                                  ├─ CamOverlay  /local/camoverlay/api/…
-                                                  └─ CamSwitcher /local/camswitcher/…</code></pre>
-      <h3 style="margin-bottom:6px">When each call happens</h3>
-      <table>
-        <thead><tr><th>When</th><th>Purpose</th></tr></thead>
+  <!-- ===== INSTALL ===== -->
+  <section id="install" style="max-width:1160px; margin:0 auto; padding:56px 24px; border-top:1px solid var(--hairline);">
+    <h2 style="font-size:clamp(24px,3.4vw,34px); letter-spacing:-.02em; margin:0 0 10px;">Install</h2>
+    <p style="color:var(--text-dim); font-size:16px; max-width:620px; margin:0 0 36px;">Works with the Elgato Stream Deck app 6.5+ on macOS and Windows.</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px; align-items:start;" class="grid-2col">
+      <div style="display:grid; gap:14px;">
+        <div style="position:relative; padding:18px 18px 18px 62px; background:linear-gradient(180deg,var(--surface-solid),var(--surface-2)); border:1px solid var(--border); border-radius:14px;">
+          <span style="position:absolute; left:16px; top:16px; width:32px; height:32px; border-radius:9px; background:linear-gradient(160deg,#36a9ff,#0a72e6); display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; box-shadow:inset 0 1px 1px rgba(255,255,255,.4);">1</span>
+          <strong style="display:block; margin-bottom:3px;">Download the plugin</strong>
+          <span style="color:var(--text-mute); font-size:14.5px;">Grab <code style="background:var(--surface-3); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font-size:12.5px; color:var(--text-2);">com.4xsdev.axis-gateway.streamDeckPlugin</code> from the <a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin/releases/tag/v1.0.0.1" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:none;">v1.0.0.1 release</a>.</span>
+        </div>
+        <div style="position:relative; padding:18px 18px 18px 62px; background:linear-gradient(180deg,var(--surface-solid),var(--surface-2)); border:1px solid var(--border); border-radius:14px;">
+          <span style="position:absolute; left:16px; top:16px; width:32px; height:32px; border-radius:9px; background:linear-gradient(160deg,#36a9ff,#0a72e6); display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; box-shadow:inset 0 1px 1px rgba(255,255,255,.4);">2</span>
+          <strong style="display:block; margin-bottom:3px;">Double-click to install</strong>
+          <span style="color:var(--text-mute); font-size:14.5px;">The Stream Deck app opens and asks to confirm — click <strong style="color:var(--text-2);">Install</strong>.</span>
+        </div>
+        <div style="position:relative; padding:18px 18px 18px 62px; background:linear-gradient(180deg,var(--surface-solid),var(--surface-2)); border:1px solid var(--border); border-radius:14px;">
+          <span style="position:absolute; left:16px; top:16px; width:32px; height:32px; border-radius:9px; background:linear-gradient(160deg,#36a9ff,#0a72e6); display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; box-shadow:inset 0 1px 1px rgba(255,255,255,.4);">3</span>
+          <strong style="display:block; margin-bottom:3px;">Add a key</strong>
+          <span style="color:var(--text-mute); font-size:14.5px;">Find <strong style="color:var(--text-2);">Axis Cam + CamStreamer</strong> in the action list and drag a key onto your deck.</span>
+        </div>
+        <div style="position:relative; padding:18px 18px 18px 62px; background:linear-gradient(180deg,var(--surface-solid),var(--surface-2)); border:1px solid var(--border); border-radius:14px;">
+          <span style="position:absolute; left:16px; top:16px; width:32px; height:32px; border-radius:9px; background:linear-gradient(160deg,#36a9ff,#0a72e6); display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; box-shadow:inset 0 1px 1px rgba(255,255,255,.4);">4</span>
+          <strong style="display:block; margin-bottom:3px;">Enter camera details</strong>
+          <span style="color:var(--text-mute); font-size:14.5px;">Set the camera <code style="background:var(--surface-3); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font-size:12.5px; color:var(--text-2);">IP</code>, <code style="background:var(--surface-3); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font-size:12.5px; color:var(--text-2);">user</code> and <code style="background:var(--surface-3); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font-size:12.5px; color:var(--text-2);">password</code> once — they're shared across keys.</span>
+        </div>
+      </div>
+      <div style="background:linear-gradient(180deg,var(--surface-solid),var(--surface-3)); border:1px solid var(--border); border-radius:18px; padding:18px;">
+        <p style="color:var(--text-mute); font-size:14.5px; line-height:1.6; margin:0 0 14px;">Prefer zero setup? The camera can export a ready-made <code style="background:var(--surface-3); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font-size:12.5px; color:var(--text-2);">.streamDeckProfile</code> with all your presets and streams pre-filled — just open it from the shared folder.</p>
+        <img src="img/MacOS-Plugin-Installation.png" alt="Exported .streamDeckProfile shown in a shared folder on macOS" style="width:100%; border-radius:10px; display:block; border:1px solid var(--border);" />
+        <p style="color:var(--text-faint); font-size:13px; margin:12px 0 0; text-align:center;">An exported profile, ready to double-click.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SETUP ===== -->
+  <section id="setup" style="max-width:1160px; margin:0 auto; padding:56px 24px; border-top:1px solid var(--hairline);">
+    <h2 style="font-size:clamp(24px,3.4vw,34px); letter-spacing:-.02em; margin:0 0 10px;">Setup example</h2>
+    <p style="color:var(--text-dim); font-size:16px; max-width:620px; margin:0 0 36px;">Pick the action on the key, fill in the camera, then choose from the live dropdown — values are read straight from your camera.</p>
+    <div style="display:grid; grid-template-columns:1.1fr .9fr; gap:32px; align-items:center;" class="grid-2col">
+      <figure style="margin:0; background:linear-gradient(180deg,var(--surface-solid),var(--surface-3)); border:1px solid var(--border); border-radius:18px; padding:16px;">
+        <img src="img/YT-setup.png" alt="CamStreamer Stream key configuration for a YouTube stream" style="width:100%; border-radius:10px; display:block;" />
+        <figcaption style="color:var(--text-faint); font-size:13px; margin-top:12px; text-align:center;">CamStreamer Stream — pick the stream to start/stop (here, a YouTube target).</figcaption>
+      </figure>
+      <div>
+        <h3 style="margin:0 0 10px; font-size:20px;">Configure once, run all night</h3>
+        <p style="color:var(--text-mute); font-size:15px; line-height:1.6; margin:0 0 16px;">Enter the camera IP, user and password, then choose the stream from the dropdown — the list is fetched live from CamStreamer. Tapping the key toggles start/stop, and it lights up with the red tally while you're on air.</p>
+        <ul style="margin:0; padding:0; list-style:none; display:grid; gap:10px;">
+          <li style="display:flex; gap:10px; align-items:center; color:var(--text-2); font-size:14.5px;"><span style="width:7px; height:7px; border-radius:50%; background:#3a93ec; flex:none;"></span>Live dropdowns read directly from the camera</li>
+          <li style="display:flex; gap:10px; align-items:center; color:var(--text-2); font-size:14.5px;"><span style="width:7px; height:7px; border-radius:50%; background:#3ec06f; flex:none;"></span>Credentials shared across every key</li>
+          <li style="display:flex; gap:10px; align-items:center; color:var(--text-2); font-size:14.5px;"><span style="width:7px; height:7px; border-radius:50%; background:#ff2b2b; flex:none;"></span>Real-time tally feedback on the key</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== HOW IT WORKS ===== -->
+  <section id="how" style="max-width:1160px; margin:0 auto; padding:56px 24px; border-top:1px solid var(--hairline);">
+    <h2 style="font-size:clamp(24px,3.4vw,34px); letter-spacing:-.02em; margin:0 0 10px;">Under the hood: direct camera control</h2>
+    <p style="color:var(--text-dim); font-size:16px; max-width:620px; margin:0 0 28px;">The plugin runs inside the Stream Deck app and talks straight to the camera's own HTTP APIs over digest authentication.</p>
+    <pre style="background:var(--code-bg); border:1px solid var(--border); border-radius:16px; padding:20px; overflow-x:auto; font-size:13px; line-height:1.6; color:var(--text-2); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; margin:0 0 28px;"><code>Stream Deck key &#9472;&#9472;&#9658; plugin (Node) &#9472;&#9472;HTTP digest&#9472;&#9472;&#9658; Axis camera
+                                                  &#9500;&#9472; VAPIX PTZ   /axis-cgi/com/ptz.cgi
+                                                  &#9500;&#9472; CamStreamer /local/camstreamer/&#8230;
+                                                  &#9500;&#9472; CamOverlay  /local/camoverlay/api/&#8230;
+                                                  &#9492;&#9472; CamSwitcher /local/camswitcher/&#8230;</code></pre>
+    <h3 style="margin:0 0 14px; font-size:18px;">When each call happens</h3>
+    <div style="background:linear-gradient(180deg,var(--surface-solid),var(--surface-3)); border:1px solid var(--border); border-radius:16px; overflow:hidden;">
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead><tr><th style="text-align:left; padding:13px 18px; color:var(--text-faint); font-weight:600; border-bottom:1px solid var(--border);">When</th><th style="text-align:left; padding:13px 18px; color:var(--text-faint); font-weight:600; border-bottom:1px solid var(--border);">Purpose</th></tr></thead>
         <tbody>
-          <tr><td>Property Inspector opens</td><td>Read the live catalog — presets, streams, widgets, views — to fill the dropdown</td></tr>
-          <tr><td>Every 3 s while a key is visible</td><td>Cheap state read — stream live / widget visible / active view — to repaint the key</td></tr>
-          <tr><td>Key press</td><td>Call the matching native CGI on the camera</td></tr>
+          <tr><td style="padding:13px 18px; border-bottom:1px solid var(--row-border); color:var(--text-2);">Property Inspector opens</td><td style="padding:13px 18px; border-bottom:1px solid var(--row-border); color:var(--text-mute);">Read the live catalog — presets, streams, widgets, views — to fill the dropdown</td></tr>
+          <tr><td style="padding:13px 18px; border-bottom:1px solid var(--row-border); color:var(--text-2);">Every 3 s while a key is visible</td><td style="padding:13px 18px; border-bottom:1px solid var(--row-border); color:var(--text-mute);">Cheap state read — stream live / widget visible / active view — to repaint the key</td></tr>
+          <tr><td style="padding:13px 18px; color:var(--text-2);">Key press</td><td style="padding:13px 18px; color:var(--text-mute);">Call the matching native CGI on the camera</td></tr>
         </tbody>
       </table>
-      <p style="margin-top:20px; color:var(--text-dim)">You enter the camera IP, user and password once (stored in Stream Deck's local global settings). Digest auth is handled by the plugin, and the credentials are sent only to your camera.</p>
     </div>
+    <p style="margin:22px 0 0; color:var(--text-mute); font-size:14.5px; line-height:1.6;">You enter the camera IP, user and password once (stored in Stream Deck's local global settings). Digest auth is handled by the plugin, and the credentials are sent only to your camera.</p>
   </section>
-</main>
 
-<footer>
-  <div class="wrap">
-    <div>Axis Cam + CamStreamer · v1.0.0.1 · by Pavel Kotyza · <a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin/releases/tag/v1.0.0.1" target="_blank" rel="noopener">Download</a></div>
-    <div class="kofi">
-      <a href="https://ko-fi.com/K3K6RR4LY" target="_blank" rel="noopener">
-        <img height="34" style="height:34px;border:0" src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy Me a Coffee at ko-fi.com" />
-      </a>
+  <!-- ===== FOOTER ===== -->
+  <footer style="border-top:1px solid var(--hairline); padding:44px 24px; text-align:center; color:var(--text-faint); font-size:14px;">
+    <div style="max-width:1160px; margin:0 auto;">
+      <div style="margin-bottom:14px;">Axis Cam + CamStreamer · v1.0.0.1 · by Pavel Kotyza · <a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:none;">GitHub</a> · <a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin/releases/tag/v1.0.0.1" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:none;">Download</a></div>
+      <a href="https://ko-fi.com/K3K6RR4LY" target="_blank" rel="noopener" style="display:inline-block;"><img height="34" style="height:34px; border:0;" src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy Me a Coffee at ko-fi.com" /></a>
+      <div style="margin-top:16px; font-size:12.5px; color:var(--text-fainter); max-width:620px; margin-left:auto; margin-right:auto;">Not affiliated with Axis Communications or Elgato. CamStreamer, CamOverlay and CamSwitcher are products of CamStreamer s.r.o.</div>
     </div>
-    <div style="margin-top:14px; font-size:13px">Not affiliated with Axis Communications or Elgato. CamStreamer, CamOverlay and CamSwitcher are products of CamStreamer s.r.o.</div>
-  </div>
-</footer>
+  </footer>
+
+</div>
 
 <script>
-  (function () {
-    var root = document.documentElement;
-    var btn = document.getElementById('themeBtn');
-    var saved = null;
-    try { saved = localStorage.getItem('theme'); } catch (e) {}
-    if (!saved) {
-      saved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+(function () {
+  // --- Resolve design-export pseudo attributes (style-hover / style-before) into real CSS ---
+  var st = document.createElement('style');
+  document.head.appendChild(st);
+  var sheet = st.sheet, n = 0;
+  function rule(sel, body) { try { sheet.insertRule(sel + '{' + body + '}', sheet.cssRules.length); } catch (e) {} }
+  document.querySelectorAll('[style-before]').forEach(function (el) {
+    var c = 'dcb' + (n++); el.classList.add(c);
+    rule('.' + c + '::before', el.getAttribute('style-before'));
+  });
+  document.querySelectorAll('[style-hover]').forEach(function (el) {
+    var c = 'dch' + (n++); el.classList.add(c);
+    rule('.' + c + ':hover', el.getAttribute('style-hover'));
+  });
+
+  // --- Responsive: stack two-column grids on narrow screens, hide nav links ---
+  var resp = document.createElement('style');
+  resp.textContent =
+    '@media (max-width: 820px){ .grid-2col{ grid-template-columns:1fr !important; } }' +
+    '@media (max-width: 720px){ .navlink{ display:none !important; } }';
+  document.head.appendChild(resp);
+
+  var root = document.querySelector('[data-sd-root]');
+
+  // --- Theme toggle (persisted) ---
+  var btn = document.getElementById('themeToggle');
+  var label = document.getElementById('themeLabel');
+  function applyTheme(t) {
+    root.setAttribute('data-sd-theme', t);
+    if (label) label.textContent = (t === 'dark') ? 'Light' : 'Dark';
+    try { localStorage.setItem('sd-theme', t); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('sd-theme'); } catch (e) {}
+  var initial;
+  if (saved === 'light' || saved === 'dark') {
+    initial = saved;                       // user's explicit choice wins
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    initial = 'dark';                      // system explicitly prefers dark
+  } else {
+    initial = 'light';                     // light by default when unsure
+  }
+  applyTheme(initial);
+  if (btn) btn.addEventListener('click', function () {
+    applyTheme(root.getAttribute('data-sd-theme') === 'dark' ? 'light' : 'dark');
+  });
+
+  // --- Interactive YT key: toggle live state (tally dot + caption) ---
+  var live = true;
+  var ytKey = document.getElementById('ytKey');
+  var dot = document.getElementById('tallyDot');
+  var cap = document.getElementById('liveCaption');
+  function applyLive() {
+    if (dot) {
+      dot.style.display = live ? 'flex' : 'none';
+      dot.style.animation = live ? 'sdPulse 1.4s ease-in-out infinite' : 'none';
     }
-    apply(saved);
-    btn.addEventListener('click', function () {
-      apply(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-    });
-    function apply(theme) {
-      root.setAttribute('data-theme', theme);
-      btn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
-      try { localStorage.setItem('theme', theme); } catch (e) {}
+    if (cap) cap.textContent = live
+      ? 'On air — tap the YT key to stop the stream'
+      : 'Idle — tap the YT key to go live';
+  }
+  applyLive();
+  if (ytKey) ytKey.addEventListener('click', function () { live = !live; applyLive(); });
+
+  // --- "Live key state" switch button: Idle -> Starting… -> Live -> Idle ---
+  var swBtn = document.getElementById('ytSwitch');
+  var swImg = document.getElementById('ytSwitchImg');
+  var swCap = document.getElementById('ytSwitchCap');
+  var swOn = false, swBusy = false;
+  if (swBtn) swBtn.addEventListener('click', function () {
+    if (swBusy) return;
+    if (!swOn) {
+      // mimic starting the stream
+      swBusy = true;
+      var dots = 0;
+      swCap.textContent = 'Starting';
+      var anim = setInterval(function () { dots = (dots + 1) % 4; swCap.textContent = 'Starting' + '.'.repeat(dots); }, 300);
+      swImg.style.opacity = '.65';
+      setTimeout(function () {
+        clearInterval(anim);
+        swImg.style.opacity = '1';
+        swImg.src = 'img/YT-ON.png';
+        swCap.textContent = 'Live — on air';
+        swOn = true; swBusy = false;
+      }, 1500);
+    } else {
+      swImg.src = 'img/YT-OFF.png';
+      swCap.textContent = 'Idle — tap to go live';
+      swOn = false;
     }
-  })();
+  });
+})();
 </script>
 </body>
 </html>
