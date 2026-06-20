@@ -4,6 +4,10 @@ A native Elgato Stream Deck plugin (modern `@elgato/streamdeck` Node SDK, TypeSc
 that controls an Axis camera **directly** — the plugin talks straight to the camera's own
 HTTP APIs over digest authentication.
 
+<img width="100%" alt="Elgato_Stream_Decks-HW" src="https://github.com/user-attachments/assets/1cf1cf04-0437-4e29-8abf-89539ef67453" />
+
+
+
 ```
 Stream Deck key ─▶ plugin (Node, in the Stream Deck app) ─HTTP digest─▶ Axis camera
                                                                           ├─ VAPIX PTZ      (/axis-cgi/com/ptz.cgi)
@@ -29,6 +33,10 @@ what's actually on air.
 The red **tally dot** is exclusive to **CamStreamer streams** — it follows the broadcast
 convention and is lit only while a stream is live, so you always know your output state at a
 glance. CamSwitcher's active view is shown with a solid colour highlight instead.
+<div align="center">
+<img width="293" height="253" alt="Stream-Deck-Axis-Camera-CamStreamer-Plugin" src="https://github.com/user-attachments/assets/da0235e5-2371-4194-8591-7b8dbd4b0c83" />
+</div>
+
 
 ## Requirements
 
