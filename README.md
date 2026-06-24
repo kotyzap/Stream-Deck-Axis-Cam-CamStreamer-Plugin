@@ -20,6 +20,17 @@ catalog from the camera (presets, streams, widgets, views) and offers a dropdown
 type a CGI URL. Stream and switcher keys then poll the camera and repaint themselves to show
 what's actually on air.
 
+## What's new in 1.0.4.8
+
+- **New action — Cam Control (camera optics):** one-push **Autofocus**, **Defog**
+  (On / Off / Toggle), timed **Wiper** sweep with on-key countdown, and **IR Cut
+  Filter** (On / Off / Auto). Works on both fixed/box and PTZ cameras via
+  automatic endpoint fallback.
+- Robust **digest/basic auth** handshake with the camera (challenge-response;
+  works on AXIS OS 10 through 12).
+- Auth-DoS safe: commands do **not** retry/cascade on a `401`, so repeated bad
+  logins won't trip the camera's authentication firewall.
+
 ## Actions (all keypad — work on every Stream Deck, incl. the keys of a Stream Deck +)
 
 | Action | Tap does | Live state |
