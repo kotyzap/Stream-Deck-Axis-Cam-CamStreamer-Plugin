@@ -1,4 +1,4 @@
-# Axis Cam + CamStreamer — Stream Deck plugin
+# Camera Deck for Axis & CamStreamer — Stream Deck plugin
 
 A native Elgato Stream Deck plugin (modern `@elgato/streamdeck` Node SDK, TypeScript)
 that controls an Axis camera **directly** — the plugin talks straight to the camera's own
@@ -168,6 +168,7 @@ com.4xsdev.axis-gateway.sdPlugin/
 
 ## Changelog
 
+- **1.1.1** — Renamed to "Camera Deck for Axis & CamStreamer" for the Marketplace listing.
 - **1.1.0** — Marketplace release: manifest SDK v3 / Stream Deck 6.9+, `@elgato/streamdeck` 2.x,
   monochrome action-list icons, leftover coffee files removed.
 - **1.0.4** — Cam Control action (autofocus, defog, wiper, IR cut filter); robust digest/basic auth;
