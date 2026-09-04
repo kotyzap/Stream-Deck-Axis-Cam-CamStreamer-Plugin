@@ -1,10 +1,5 @@
-import streamDeck, {
-    action,
-    type KeyAction,
-    type KeyDownEvent,
-    type SendToPluginEvent,
-    type JsonValue,
-} from '@elgato/streamdeck';
+import streamDeck, { action, type KeyAction, type KeyDownEvent, type SendToPluginEvent } from '@elgato/streamdeck';
+import type { JsonValue } from '@elgato/utils';
 import { parseSel, sendCmd, connFrom, type Catalog } from '../gateway';
 import { LiveAction, type LiveSettings } from '../live-action';
 import { datasourceEvent, respondDatasource, type DataItem } from '../ui';

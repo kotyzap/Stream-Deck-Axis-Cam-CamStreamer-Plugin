@@ -20,7 +20,13 @@ catalog from the camera (presets, streams, widgets, views) and offers a dropdown
 type a CGI URL. Stream and switcher keys then poll the camera and repaint themselves to show
 what's actually on air.
 
-## What's new in 1.0.4.8
+## What's new in 1.1.0
+
+- **Elgato Marketplace release.** Manifest moved to SDK v3 (Stream Deck **6.9+**); runtime
+  upgraded to `@elgato/streamdeck` 2.x. Action-list icons redrawn monochrome per Marketplace
+  guidelines — key art is unchanged.
+
+## What's new in 1.0.4
 
 - **New action — Cam Control (camera optics):** one-push **Autofocus**, **Defog**
   (On / Off / Toggle), timed **Wiper** sweep with on-key countdown, and **IR Cut
@@ -35,10 +41,12 @@ what's actually on air.
 
 | Action | Tap does | Live state |
 |---|---|---|
-| **PTZ Preset** | Go to the chosen server preset (or Home) | — |
+| **PTZ Preset** | Go to the chosen server preset (or Home) | Lit as a radio group per camera + view area |
+| **AXIS Guarded Tour** | Start / stop a Guarded Tour (shares the PTZ radio group with presets) | Reflects the tour's running state |
 | **CamStreamer Stream** | Start / stop a stream | Shows **“Starting…”** while connecting, then a solid red tally dot while live |
 | **CamOverlay Widget** | Show / hide a CamOverlay Custom Graphic | Key lit while the widget is visible |
 | **CamSwitcher Source** | Switch to a CamSwitcher view | Key highlighted on the active view (no red dot) |
+| **Cam Control** | Camera optics: one-push autofocus, defog (on/off/toggle), timed wiper, IR cut filter (on/off/auto) | Toggle variants show ON/OFF; wiper shows a countdown |
 
 The red **tally dot** is exclusive to **CamStreamer streams** — it follows the broadcast
 convention and is lit only while a stream is live, so you always know your output state at a
@@ -51,7 +59,7 @@ glance. CamSwitcher's active view is shown with a solid colour highlight instead
 
 ## Requirements
 
-- Stream Deck app **6.5+** (the plugin ships a Node 20 runtime via the manifest).
+- Stream Deck app **6.9+** (the plugin ships a Node 20 runtime via the manifest). Also available on the Elgato Marketplace.
 - Network reachability to the camera (LAN, or an `https://…device-connect.net` URL off-LAN).
 - The relevant CamStreamer suite apps installed on the camera for those actions to appear
   (CamStreamer for streams, CamOverlay for widgets, CamSwitcher for views). PTZ needs only a
@@ -159,6 +167,12 @@ com.4xsdev.axis-gateway.sdPlugin/
 ```
 
 ## Changelog
+
+- **1.1.0** — Marketplace release: manifest SDK v3 / Stream Deck 6.9+, `@elgato/streamdeck` 2.x,
+  monochrome action-list icons, leftover coffee files removed.
+- **1.0.4** — Cam Control action (autofocus, defog, wiper, IR cut filter); robust digest/basic auth;
+  body-aware CGI result check; explicit `Content-Length` on POST; no retry cascade on `401`.
+- **1.0.3** — AXIS Guarded Tour action.
 
 - **1.0.2** — HTTPS added. A **Protocol** selector in each action's Property Inspector lets you
   choose `HTTP (port 80)` or `HTTPS — untrusted cert (port 443)`; self-signed / untrusted

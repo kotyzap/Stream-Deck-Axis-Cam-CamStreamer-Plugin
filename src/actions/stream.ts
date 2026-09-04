@@ -1,10 +1,5 @@
-import streamDeck, {
-    action,
-    type KeyAction,
-    type KeyDownEvent,
-    type SendToPluginEvent,
-    type JsonValue,
-} from '@elgato/streamdeck';
+import streamDeck, { action, type KeyAction, type KeyDownEvent, type SendToPluginEvent } from '@elgato/streamdeck';
+import type { JsonValue } from '@elgato/utils';
 import { fetchState, parseSel, sendCmd, connFrom, type Catalog } from '../gateway';
 import { LiveAction, type LiveSettings } from '../live-action';
 import { datasourceEvent, respondDatasource, type DataItem } from '../ui';
@@ -33,8 +28,8 @@ export class StreamAction extends LiveAction {
             await a.setState(0);
             return;
         }
-        // Live = solid red tally dot (state 1); idle = off (state 0).
-        this.setLive(a, (await this.currentOn(settings)) === true);
+        // Live = blinking red tally dot (states 1/2); idle = off (state 0).
+        this.setLiveBlinking(a, (await this.currentOn(settings)) === true);
     }
 
     override async onKeyDown(ev: KeyDownEvent<LiveSettings>): Promise<void> {

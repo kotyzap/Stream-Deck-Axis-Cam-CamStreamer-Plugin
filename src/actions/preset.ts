@@ -1,16 +1,14 @@
-import streamDeck, {
-    action,
-    SingletonAction,
-    type KeyAction,
-    type KeyDownEvent,
-    type WillAppearEvent,
-    type DidReceiveSettingsEvent,
-    type SendToPluginEvent,
-    type JsonValue,
-    type JsonObject,
-} from '@elgato/streamdeck';
+import streamDeck, { action, SingletonAction, type KeyAction, type KeyDownEvent, type WillAppearEvent, type DidReceiveSettingsEvent, type SendToPluginEvent } from '@elgato/streamdeck';
+import type { JsonObject, JsonValue } from '@elgato/utils';
 import { parseSel, sendCmd, connFrom, type Catalog } from '../gateway';
 import { datasourceEvent, respondDatasource, type DataItem } from '../ui';
+import {
+    groupKey,
+    getActivePreset,
+    setActivePreset,
+    registerRepaint,
+    fireRepaint,
+} from '../ptz-radio';
 
 type PresetSettings = {
     sel?: string;
@@ -52,25 +50,23 @@ function buildPresetItems(c: Catalog): DataItem[] {
 
 // Presets are radio PER CAMERA + VIEW AREA (PTZ channel): pressing a preset (or Home)
 // lights it and clears other presets in the SAME camera AND same view area only.
-// Each view area has its own independent PTZ, so other view areas are never touched.
+// Guard tours share this group (see ptz-radio.ts) — starting a tour clears the active
+// preset here, and pressing a preset stops the running tour (handled in the gateway).
 // State is in-memory and resets on plugin restart.
-const activePreset = new Map<string, string>(); // `${cameraKey}::${channelKey}` -> active sel JSON
-
-/** Camera identity for the radio scope (per-action IP, falling back to '' = shared global). */
-const cameraKey = (s: PresetSettings): string => String(s.cameraIp ?? '');
-/** View area within a camera (PTZ channel; '' when the device is single-channel). */
-const channelKey = (sel: { camera?: string } | null): string => String(sel?.camera ?? '');
-/** Radio group: one active preset per camera + view area. */
-const groupKey = (s: PresetSettings, sel: { camera?: string } | null): string =>
-    `${cameraKey(s)}::${channelKey(sel)}`;
 
 /** Whether a given preset/Home key is the currently-active one for its camera + view area. */
 function isActive(settings: PresetSettings, sel: ReturnType<typeof parseSel>): boolean {
-    return !!sel && activePreset.get(groupKey(settings, sel)) === settings.sel;
+    return !!sel && getActivePreset(groupKey(settings, sel)) === settings.sel;
 }
 
 @action({ UUID: 'com.4xsdev.axis-gateway.preset' })
 export class PresetAction extends SingletonAction<PresetSettings> {
+    constructor() {
+        super();
+        // Let guard-tour presses repaint our keys (e.g. clear a preset when a tour starts).
+        registerRepaint((gk) => this.repaintGroup(gk));
+    }
+
     private async paint(a: KeyAction<PresetSettings>, settings: PresetSettings): Promise<void> {
         const sel = parseSel(settings.sel);
         if (sel?.title) await a.setTitle(sel.title);
@@ -107,10 +103,12 @@ export class PresetAction extends SingletonAction<PresetSettings> {
             const r = await sendCmd(params as Record<string, string>, connFrom(ev.payload.settings));
             if (r.ok) {
                 // Win the radio slot for this camera + view area only (Home included).
+                // The gateway already stopped any tour on this channel; fireRepaint
+                // refreshes both preset keys and guard-tour keys in the group.
                 const gk = groupKey(ev.payload.settings, sel);
-                activePreset.set(gk, ev.payload.settings.sel ?? '');
+                setActivePreset(gk, ev.payload.settings.sel ?? '');
                 await ev.action.showOk();
-                await this.repaintGroup(gk);
+                await fireRepaint(gk);
             } else {
                 await ev.action.showAlert();
             }

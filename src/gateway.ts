@@ -21,16 +21,21 @@ export type Conn = GlobalSettings;
 /** A per-action selection (stored as a JSON string in the `sel` setting). */
 export type Selection = {
     title?: string;
-    action?: string; // ptz.preset | ptz.home
+    action?: string; // ptz.preset | ptz.home | guardtour.start | guardtour.stop
     name?: string;
     camera?: string;
     stream_id?: string;
     service_id?: number;
+    guardtour_id?: string; // GuardTour group id, e.g. "G0"
+    enabled?: string; // cam.defog: "1"/"0"
+    mode?: string; // cam.ircut: "on"/"off"/"auto"
+    state?: string; // cam.wiper: "on"/"off" (internal, for timed run)
 };
 
 export type Section<T> = { available: boolean; items: T[]; error?: string };
 export type Catalog = {
     ptz_presets: Section<{ channel: number | null; no: number; name: string }>;
+    guard_tours: Section<{ channel: number | null; id: string; name: string; running: boolean }>;
     overlay_services: Section<{ service_id: number; name: string; enabled: boolean | null }>;
     streams: Section<{ stream_id: string; name: string; enabled: boolean | null }>;
     views: Section<{ name: string; label: string }>;
@@ -46,8 +51,19 @@ export function connFrom(s: GlobalSettings): Conn {
     return { cameraIp: s.cameraIp, cameraPort: s.cameraPort, cameraUser: s.cameraUser, cameraPass: s.cameraPass, cameraTls: s.cameraTls };
 }
 export async function resolveConn(conn?: Conn): Promise<Conn> {
-    if (conn?.cameraIp) return conn;
-    return streamDeck.settings.getGlobalSettings<GlobalSettings>();
+    // Merge per-action settings OVER the global config field-by-field. The old
+    // all-or-nothing logic (`if (conn?.cameraIp) return conn`) meant a button with an
+    // IP but a blank password sent an empty password and failed auth — repeated
+    // failures then trip the camera's Authentication-DoS firewall. Merging lets a
+    // button override just the fields it sets and inherit the rest (e.g. credentials).
+    const g = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+    return {
+        cameraIp: conn?.cameraIp || g.cameraIp,
+        cameraPort: conn?.cameraPort || g.cameraPort,
+        cameraUser: conn?.cameraUser || g.cameraUser,
+        cameraPass: conn?.cameraPass || g.cameraPass,
+        cameraTls: conn?.cameraTls ?? g.cameraTls,
+    };
 }
 
 /** True when the IP is empty or points at the local machine (can't reach the camera). */
@@ -65,14 +81,24 @@ type RawRes = { status: number; headers: http.IncomingHttpHeaders; text: string 
 function rawRequest(opts: http.RequestOptions, tls: boolean, body?: string): Promise<RawRes> {
     return new Promise((resolve, reject) => {
         const lib = tls ? https : http;
-        const req = lib.request({ ...opts, rejectUnauthorized: false } as https.RequestOptions, (res) => {
+        // Set an explicit Content-Length for request bodies. Without it Node sends the
+        // body with Transfer-Encoding: chunked, which the Axis embedded CGI server does
+        // NOT accept for POSTs (e.g. opticscontrol.cgi) — it hangs waiting for the body
+        // and never responds. This is why POST commands (autofocus, overlay set) stalled
+        // with no result while GET commands worked. curl always sends Content-Length.
+        const headers: http.OutgoingHttpHeaders = {};
+        if (opts.headers) Object.assign(headers, opts.headers);
+        if (body !== undefined) headers['Content-Length'] = Buffer.byteLength(body);
+        const req = lib.request({ ...opts, headers, rejectUnauthorized: false } as https.RequestOptions, (res) => {
             let d = '';
             res.on('data', (c) => (d += c));
             res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, text: d }));
         });
         req.on('error', reject);
+        // Guarantee the promise settles even on a stalled connection, so the UI always
+        // gets a result (red alert) instead of hanging silently with no feedback.
         req.setTimeout(TIMEOUT_MS, () => req.destroy(new Error('timeout')));
-        if (body) req.write(body);
+        if (body !== undefined) req.write(body);
         req.end();
     });
 }
@@ -137,6 +163,29 @@ function toBool(v: unknown): boolean | null {
 }
 function fail<T>(error: string): Section<T> { return { available: false, items: [], error }; }
 
+// CamStreamer's HTTP API answers a removed/unknown CGI command with the body
+// "Http API: command not found" — and often with HTTP 200, not a 4xx. So a plain
+// status check isn't enough to tell a present endpoint from an absent one. Treat a
+// response as genuinely OK only when the status is 2xx AND the body doesn't carry
+// that marker. Lets us probe new-vs-legacy paths and fall back reliably either way.
+function camStreamerOk(res: CamRes): boolean {
+    return res.ok && !/command not found/i.test(res.text);
+}
+
+// Probe a list of candidate CGI paths in order and return the first response that
+// camStreamerOk() accepts; if none work, return the last response so the caller can
+// report the real status/body. This is the "support both versions" primitive: a CGI
+// that was renamed between CamStreamer-suite app versions is listed new-path-first,
+// legacy-path-second, and one package then works on old and new installs alike.
+async function camGetFirst(conn: Conn, paths: string[]): Promise<CamRes> {
+    let last: CamRes = { ok: false, status: 0, text: 'no endpoint tried' };
+    for (const path of paths) {
+        last = await camGet(conn, path);
+        if (camStreamerOk(last)) return last;
+    }
+    return last;
+}
+
 // ---- discovery (direct VAPIX + product CGIs) --------------------------------
 async function discoverPresets(conn: Conn): Promise<Section<{ channel: number | null; no: number; name: string }>> {
     const res = await camGet(conn, '/axis-cgi/com/ptz.cgi?query=presetposall');
@@ -150,6 +199,32 @@ async function discoverPresets(conn: Conn): Promise<Section<{ channel: number | 
         const m = line.match(/^presetposno(\d+)=(.*)$/);
         if (m) items.push({ channel, no: parseInt(m[1], 10), name: m[2].trim() });
     }
+    return { available: true, items };
+}
+
+// AXIS Guarded Tours live in the parameter system (not ptz.cgi). Each tour is a
+// group root.GuardTour.G# with Name, CamNbr (the PTZ channel — matches the preset
+// "Preset Positions for camera N" numbering), Running (yes/no) and Active (yes/no).
+async function discoverGuardTours(conn: Conn): Promise<Section<{ channel: number | null; id: string; name: string; running: boolean }>> {
+    const res = await camGet(conn, '/axis-cgi/param.cgi?action=list&group=GuardTour');
+    if (!res.ok) return fail(`param.cgi returned ${res.status}`);
+    type T = { channel: number | null; id: string; name: string; running: boolean; active: boolean };
+    const tours = new Map<string, T>();
+    for (const raw of res.text.split(/\r?\n/)) {
+        const m = raw.trim().match(/^root\.GuardTour\.(G\d+)\.(\w+)=(.*)$/);
+        if (!m) continue;
+        const [, id, key, val] = m;
+        let t = tours.get(id);
+        if (!t) { t = { channel: null, id, name: '', running: false, active: false }; tours.set(id, t); }
+        if (/^Name$/i.test(key)) t.name = val.trim();
+        else if (/^CamNbr$/i.test(key)) { const n = parseInt(val, 10); t.channel = Number.isFinite(n) ? n : null; }
+        else if (/^Running$/i.test(key)) t.running = /^yes$/i.test(val.trim());
+        else if (/^Active$/i.test(key)) t.active = /^yes$/i.test(val.trim());
+    }
+    // Skip unused/empty tour slots Axis pre-creates (no name and not active).
+    const items = [...tours.values()]
+        .filter((t) => t.active || t.name.length > 0)
+        .map((t) => ({ channel: t.channel, id: t.id, name: t.name || t.id, running: t.running }));
     return { available: true, items };
 }
 
@@ -170,7 +245,7 @@ async function discoverOverlays(conn: Conn): Promise<Section<{ service_id: numbe
 async function discoverStreams(conn: Conn): Promise<Section<{ stream_id: string; name: string; enabled: boolean | null }>> {
     const tryEp = async (path: string) => {
         const res = await camGet(conn, path);
-        if (!res.ok) return null;
+        if (!camStreamerOk(res)) return null; // skips 4xx AND 200 "command not found"
         const data = tryParse(res.text);
         if (!data || typeof data !== 'object') return null;
         const arr: any[] | null = Array.isArray(data.streamList) ? data.streamList
@@ -204,10 +279,35 @@ async function discoverViews(conn: Conn): Promise<Section<{ name: string; label:
 export async function discover(conn?: Conn): Promise<{ ok: boolean; catalog: Catalog }> {
     const c = await resolveConn(conn);
     if (!c.cameraIp) throw new Error('Camera IP not set (open the action settings)');
-    const [ptz_presets, overlay_services, streams, views] = await Promise.all([
-        discoverPresets(c), discoverOverlays(c), discoverStreams(c), discoverViews(c),
+    const [ptz_presets, guard_tours, overlay_services, streams, views] = await Promise.all([
+        discoverPresets(c), discoverGuardTours(c), discoverOverlays(c), discoverStreams(c), discoverViews(c),
     ]);
-    return { ok: true, catalog: { ptz_presets, overlay_services, streams, views } };
+    return { ok: true, catalog: { ptz_presets, guard_tours, overlay_services, streams, views } };
+}
+
+/** Live running state of every guard tour, keyed by group id (e.g. "G0" -> true). */
+export async function fetchGuardTourState(conn?: Conn): Promise<Record<string, boolean>> {
+    const c = await resolveConn(conn);
+    const sec = await discoverGuardTours(c);
+    const out: Record<string, boolean> = {};
+    for (const t of sec.items) out[t.id] = t.running;
+    return out;
+}
+
+/**
+ * Stop any guard tour currently running on the given PTZ channel. When `camera`
+ * is empty (single view-area device), stop every running tour. Used to keep
+ * "one PTZ action at a time": a preset/Home press or a different tour wins.
+ */
+async function stopToursOnChannel(conn: Conn, camera?: string): Promise<void> {
+    const sec = await discoverGuardTours(conn);
+    if (!sec.available) return;
+    const ch = camera != null && camera !== '' ? parseInt(camera, 10) : null;
+    for (const t of sec.items) {
+        if (!t.running) continue;
+        if (ch != null && t.channel != null && t.channel !== ch) continue;
+        await camGet(conn, `/axis-cgi/param.cgi?action=update&GuardTour.${t.id}.Running=no`);
+    }
 }
 
 export async function fetchState(conn?: Conn): Promise<GatewayState> {
@@ -224,6 +324,39 @@ const PTZ = '/axis-cgi/com/ptz.cgi';
 const bool = (v?: string) => (v === '1' || v === 'true' || v === 'on' ? '1' : '0');
 const withCam = (q: string, cam?: string) => (cam ? `${q}&camera=${encodeURIComponent(cam)}` : q);
 
+// One-push autofocus via the AXIS Optics Control API (JSON over opticscontrol.cgi).
+// This is the correct path for fixed/box cameras (the API is hardware-exclusive and
+// does NOT support PTZ cameras). Two things matter beyond the method name:
+//   1. method is case-sensitive: "performAutofocus" (lowercase f).
+//   2. opticsId is device-specific — the AXIS Q1656 does not necessarily use "0", so
+//      we discover the real id(s) via getOptics rather than assuming.
+// opticscontrol.cgi returns HTTP 200 even on logical errors, so we parse the `error`
+// object and surface its code/message instead of pretending success.
+async function opticsAutoFocus(conn: Conn, opticsId?: string): Promise<CamRes> {
+    const post = (payload: object) => camPost(conn, '/axis-cgi/opticscontrol.cgi', JSON.stringify(payload));
+
+    let ids: string[] = opticsId ? [opticsId] : [];
+    if (!ids.length) {
+        const g = await post({ apiVersion: '1.0', context: 'sd', method: 'getOptics' });
+        // Auth (401) or connection (0) failure: bail out now. Retrying / cascading just
+        // piles on more failed logins and trips the camera's Authentication-DoS firewall.
+        if (g.status === 401 || g.status === 0) return g;
+        const optics = tryParse(g.text)?.data?.optics;
+        if (Array.isArray(optics)) ids = optics.map((o: any) => String(o.opticsId)).filter((s: string) => s.length > 0);
+    }
+    if (!ids.length) ids = ['0']; // last-resort default
+
+    const res = await post({
+        apiVersion: '1.0',
+        context: 'sd',
+        method: 'performAutofocus',
+        params: { optics: ids.map((id) => ({ opticsId: id })) },
+    });
+    const j = tryParse(res.text);
+    if (j?.error) return { ok: false, status: res.status, text: `opticscontrol ${j.error.code}: ${j.error.message}` };
+    return res;
+}
+
 export async function sendCmd(params: Record<string, string>, conn?: Conn): Promise<{ ok: boolean; error?: string }> {
     const c = await resolveConn(conn);
     if (!c.cameraIp) return { ok: false, error: 'Camera IP not set' };
@@ -231,38 +364,131 @@ export async function sendCmd(params: Record<string, string>, conn?: Conn): Prom
     let res: CamRes;
     switch (a) {
         case 'ptz.preset':
+            // A running guard tour would fight the move (and keep resuming), so stop
+            // any tour on this channel first — only one PTZ action runs at a time.
+            await stopToursOnChannel(c, params.camera);
             if (params.name) res = await camGet(c, withCam(`${PTZ}?gotoserverpresetname=${encodeURIComponent(params.name)}`, params.camera));
             else if (params.no) res = await camGet(c, withCam(`${PTZ}?gotoserverpresetno=${encodeURIComponent(params.no)}`, params.camera));
             else return { ok: false, error: 'preset requires name or no' };
             break;
         case 'ptz.home':
+            await stopToursOnChannel(c, params.camera);
             res = await camGet(c, withCam(`${PTZ}?move=home`, params.camera));
             break;
-        case 'stream.set':
-            res = await camGet(c, `/local/camstreamer/set_stream_enabled.cgi?stream_id=${encodeURIComponent(params.stream_id)}&enabled=${bool(params.enabled)}`);
+        case 'guardtour.start':
+            if (!params.guardtour_id) return { ok: false, error: 'guardtour.start requires guardtour_id' };
+            // One tour per channel: stop others on this channel before starting ours.
+            await stopToursOnChannel(c, params.camera);
+            res = await camGet(c, `/axis-cgi/param.cgi?action=update&GuardTour.${encodeURIComponent(params.guardtour_id)}.Running=yes`);
             break;
+        case 'guardtour.stop':
+            if (!params.guardtour_id) return { ok: false, error: 'guardtour.stop requires guardtour_id' };
+            res = await camGet(c, `/axis-cgi/param.cgi?action=update&GuardTour.${encodeURIComponent(params.guardtour_id)}.Running=no`);
+            break;
+        case 'stream.set': {
+            // CamStreamer 5/6 renamed `set_stream_enabled.cgi` → `stream/set.cgi`.
+            // Probe new-first, legacy-second so one package drives both.
+            const q = `stream_id=${encodeURIComponent(params.stream_id)}&enabled=${bool(params.enabled)}`;
+            res = await camGetFirst(c, [
+                `/local/camstreamer/stream/set.cgi?${q}`,         // CamStreamer 5/6
+                `/local/camstreamer/set_stream_enabled.cgi?${q}`, // CamStreamer ≤4 (legacy)
+            ]);
+            break;
+        }
         case 'overlay.toggle':
             return overlayToggle(c, Number(params.service_id), bool(params.enabled) === '1');
         case 'view.switch':
             res = await camGet(c, `/local/camswitcher/playlist_switch.cgi?playlist_name=${encodeURIComponent(params.name)}`);
             break;
+        // ---- Cam Control (optics) ------------------------------------------
+        // These VAPIX paths vary a little by model/firmware; they're grouped here
+        // so they're easy to adjust for a specific camera if needed.
+        case 'cam.autofocus': {
+            // Fixed/box cameras (e.g. AXIS Q1656) trigger autofocus via the Optics
+            // Control API. PTZ cameras don't support opticscontrol.cgi, so fall back
+            // to the legacy optics-setup CGI and then PTZ continuous autofocus.
+            res = await opticsAutoFocus(c, params.optics_id);
+            // Only fall back to legacy optics CGIs when the endpoint genuinely isn't
+            // supported. On an auth (401) or connection (0) failure, do NOT cascade —
+            // extra failed logins trip the camera's Authentication-DoS firewall.
+            if (!res.ok && res.status !== 401 && res.status !== 0) {
+                let fb = await camGet(c, '/axis-cgi/opticssetup.cgi?autofocus=perform');
+                if (!fb.ok) fb = await camGet(c, withCam(`${PTZ}?autofocus=on`, params.camera));
+                if (fb.ok) res = fb;
+            }
+            break;
+        }
+        case 'cam.defog':
+            res = await camGet(c, `/axis-cgi/param.cgi?action=update&ImageSource.I0.Sensor.Defog=${bool(params.enabled) === '1' ? 'on' : 'off'}`);
+            break;
+        case 'cam.defog.toggle': {
+            // Single-key toggle: read the current state and flip it. If the camera
+            // doesn't expose the parameter (state unknown), default to turning it on.
+            const cur = await readDefog(c);
+            const want = cur === true ? 'off' : 'on';
+            res = await camGet(c, `/axis-cgi/param.cgi?action=update&ImageSource.I0.Sensor.Defog=${want}`);
+            break;
+        }
+        case 'cam.wiper': {
+            // Wiper is a PTZ auxiliary command. The value is CASE-SENSITIVE: the
+            // ONVIF-standard token is "tt:Wiper|On"/"tt:Wiper|Off" (capital W) — the old
+            // lowercase "wiper" is not valid on any current model. `state=off` sends the
+            // explicit Off; otherwise turn it on (positioning cams use one-shot "speeddry").
+            const aux = (v: string) => withCam(`${PTZ}?auxiliary=${encodeURIComponent(v)}`, params.camera);
+            if (params.state === 'off') {
+                res = await camGet(c, aux('tt:Wiper|Off'));
+            } else {
+                res = await camGet(c, aux('tt:Wiper|On'));
+                if (!res.ok) res = await camGet(c, aux('speeddry'));
+            }
+            break;
+        }
+        case 'cam.ircut': {
+            const m = params.mode === 'off' ? 'off' : params.mode === 'auto' ? 'auto' : 'on';
+            // PTZ cameras: ptz.cgi?ircutfilter=. Fixed/box cameras: the IrCutFilter
+            // parameter (yes = filter in/day, no = filter out/night, auto).
+            res = await camGet(c, withCam(`${PTZ}?ircutfilter=${m}`, params.camera));
+            if (!res.ok) {
+                const v = m === 'on' ? 'yes' : m === 'off' ? 'no' : 'auto';
+                res = await camGet(c, `/axis-cgi/param.cgi?action=update&ImageSource.I0.DayNight.IrCutFilter=${v}`);
+            }
+            break;
+        }
         default:
             return { ok: false, error: `unknown action ${a}` };
     }
-    return { ok: res.ok, error: res.ok ? undefined : `camera returned ${res.status}` };
+    // Body-aware verdict for every command: a CamStreamer-suite CGI that was renamed
+    // away can answer HTTP 200 with "command not found", which res.ok alone would
+    // misread as success. camStreamerOk() catches that and gives a clearer error.
+    if (camStreamerOk(res)) return { ok: true };
+    const error = /command not found/i.test(res.text)
+        ? 'endpoint not found — check the installed CamStreamer/CamOverlay/CamSwitcher app version'
+        : res.status ? `camera returned ${res.status}` : res.text || 'request failed';
+    return { ok: false, error };
 }
 
 // CamOverlay show/hide: persistent full-list write-back.
 async function overlayToggle(conn: Conn, id: number, want: boolean): Promise<{ ok: boolean; error?: string }> {
     const list = await camGet(conn, '/local/camoverlay/api/services.cgi?action=get');
-    if (!list.ok) return { ok: false, error: `services.cgi get ${list.status}` };
+    if (!camStreamerOk(list)) return { ok: false, error: `services.cgi get ${list.status || list.text}` };
     const data = tryParse(list.text);
     const services: any[] = Array.isArray(data?.services) ? data.services : Array.isArray(data) ? data : [];
     let found = false;
     for (const s of services) if (Number(s.id ?? s.service_id ?? s.serviceID) === id) { s.enabled = want ? 1 : 0; found = true; }
     if (!found) return { ok: false, error: `service ${id} not found` };
     const post = await camPost(conn, '/local/camoverlay/api/services.cgi?action=set', JSON.stringify({ services }));
-    return { ok: post.ok, error: post.ok ? undefined : `services.cgi set ${post.status}` };
+    return camStreamerOk(post) ? { ok: true } : { ok: false, error: `services.cgi set ${post.status || post.text}` };
+}
+
+/** Current defog state, or null if the camera doesn't expose the parameter. */
+export async function readDefog(conn?: Conn): Promise<boolean | null> {
+    const c = await resolveConn(conn);
+    if (!c.cameraIp) return null;
+    const res = await camGet(c, '/axis-cgi/param.cgi?action=list&group=ImageSource.I0.Sensor.Defog');
+    if (!res.ok) return null;
+    const m = res.text.match(/Defog\s*=\s*(\w+)/i);
+    if (!m) return null;
+    return /^(on|yes|true|1)$/i.test(m[1]);
 }
 
 export function parseSel(sel: string | undefined): Selection | null {

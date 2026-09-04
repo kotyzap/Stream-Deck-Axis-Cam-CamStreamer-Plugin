@@ -1,4 +1,5 @@
-import streamDeck, { type JsonValue, type Action, type JsonObject } from '@elgato/streamdeck';
+import streamDeck, { type Action } from '@elgato/streamdeck';
+import type { JsonValue, JsonObject } from '@elgato/utils';
 import { discover, resolveConn, isLoopbackOrEmpty, type Catalog, type Conn } from './gateway';
 
 export type DataItem = { value: string; label?: string; disabled?: boolean };
@@ -26,7 +27,7 @@ export async function respondDatasource(
 
     // No usable camera IP yet (empty or loopback) — prompt instead of erroring.
     if (isLoopbackOrEmpty(c.cameraIp)) {
-        await streamDeck.ui.current?.sendToPropertyInspector({ event: eventName, items: [{ value: '', label: 'Enter LAN IP', disabled: true }] });
+        await streamDeck.ui.sendToPropertyInspector({ event: eventName, items: [{ value: '', label: 'Enter LAN IP', disabled: true }] });
         return;
     }
 
@@ -39,7 +40,7 @@ export async function respondDatasource(
         streamDeck.logger.error(`datasource ${eventName} failed: ${String(err)}`);
         items = [{ value: '', label: `⚠ ${err instanceof Error ? err.message : 'error'}`, disabled: true }];
     }
-    await streamDeck.ui.current?.sendToPropertyInspector({ event: eventName, items });
+    await streamDeck.ui.sendToPropertyInspector({ event: eventName, items });
 
     // Pre-select the first real item if this key hasn't been configured yet, so it
     // works immediately without the user opening the dropdown.

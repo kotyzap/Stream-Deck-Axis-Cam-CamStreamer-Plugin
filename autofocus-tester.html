@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AXIS Autofocus Tester — opticscontrol.cgi</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --fg: #1b1f24; --muted: #5b6470;
+    --border: #d7dce2; --accent: #2563eb; --accent-fg: #ffffff;
+    --ok: #15803d; --err: #b91c1c; --code-bg: #f0f2f5;
+  }
+  [data-theme="dark"] {
+    --bg: #15181d; --card: #1e232b; --fg: #e7ebf0; --muted: #9aa4b1;
+    --border: #313842; --accent: #3b82f6; --accent-fg: #ffffff;
+    --ok: #4ade80; --err: #f87171; --code-bg: #0f1216;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .wrap { max-width: 640px; margin: 32px auto; padding: 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input { width: 100%; padding: 9px 11px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 14px; }
+  .row { display: flex; gap: 12px; } .row > div { flex: 1; }
+  .btns { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  button { border: 0; border-radius: 8px; padding: 11px 16px; font-size: 14px;
+    font-weight: 600; cursor: pointer; }
+  .primary { background: var(--accent); color: var(--accent-fg); }
+  .ghost { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+  .theme-toggle { float: right; background: transparent; border: 1px solid var(--border);
+    color: var(--fg); border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 500; }
+  .status { margin-top: 16px; padding: 12px 14px; border-radius: 8px; font-size: 14px;
+    background: var(--code-bg); white-space: pre-wrap; word-break: break-word; min-height: 20px; }
+  .status.ok { color: var(--ok); } .status.err { color: var(--err); }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+  ol { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 13px; }
+  ol li { margin: 4px 0; } a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <button class="theme-toggle" onclick="toggleTheme()">🌓 Theme</button>
+    <h1>AXIS Autofocus Tester</h1>
+    <p class="sub">Sends <code>performAutofocus</code> to <code>/axis-cgi/opticscontrol.cgi</code> (POST/JSON).</p>
+
+    <div class="row">
+      <div><label>Camera IP</label><input id="ip" value="192.168.1.156" /></div>
+      <div><label>Optics ID</label><input id="optics" value="0" /></div>
+    </div>
+
+    <div class="btns">
+      <button class="ghost" onclick="openLogin()">1 · Log in to camera</button>
+      <button class="primary" onclick="run('performAutofocus')">2 · Run autofocus</button>
+      <button class="ghost" onclick="run('getOptics')">Get optics</button>
+    </div>
+
+    <div id="status" class="status">Ready. Do step 1 once (logs the browser into the camera), then step 2.</div>
+  </div>
+
+  <div class="card">
+    <p class="sub" style="margin:0 0 8px">Why two steps?</p>
+    <ol>
+      <li>The camera needs digest auth. Clicking <b>Log in</b> opens <code>http://[ip]</code> so the browser caches your <code>root</code> credentials for that camera.</li>
+      <li>The autofocus request is then sent fire-and-forget (no-cors). You won't see the JSON reply in the browser, but <b>watch the lens — it will refocus</b>.</li>
+      <li>For a readable reply, the reliable path is still <code>curl</code> (it does digest + reads the response).</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+  function toggleTheme() {
+    const r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  }
+  function openLogin() {
+    const ip = document.getElementById('ip').value.trim();
+    window.open('http://' + ip + '/', '_blank');
+  }
+  function setStatus(msg, cls) {
+    const s = document.getElementById('status');
+    s.textContent = msg; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  async function run(method) {
+    const ip = document.getElementById('ip').value.trim();
+    const opticsId = document.getElementById('optics').value.trim() || '0';
+    const url = 'http://' + ip + '/axis-cgi/opticscontrol.cgi';
+    const body = JSON.stringify({
+      apiVersion: '1.0', context: 'tester', method,
+      params: { optics: [{ opticsId }] }
+    });
+    setStatus('Sending ' + method + ' …', '');
+    // Try a readable CORS request first; if the camera blocks CORS (it usually does),
+    // fall back to a fire-and-forget no-cors POST. text/plain avoids a CORS preflight.
+    try {
+      const r = await fetch(url, { method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'text/plain' }, body });
+      const text = await r.text();
+      setStatus(method + ' → HTTP ' + r.status + '\n' + text, r.ok ? 'ok' : 'err');
+    } catch (e) {
+      try {
+        await fetch(url, { method: 'POST', mode: 'no-cors', credentials: 'include',
+          headers: { 'Content-Type': 'text/plain' }, body });
+        setStatus(method + ' sent (fire-and-forget). Watch the lens — it should refocus.\n'
+          + 'If nothing happens, click step 1 first and log in as root.', 'ok');
+      } catch (e2) {
+        setStatus('Request failed: ' + e2 + '\nMake sure you logged in (step 1) and the IP is correct.', 'err');
+      }
+    }
+  }
+</script>
+</body>
+</html>

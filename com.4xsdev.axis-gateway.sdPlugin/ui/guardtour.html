@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+</head>
+<body>
+    <sdpi-item label="Camera IP">
+        <sdpi-textfield setting="cameraIp" global placeholder="192.168.1.156"></sdpi-textfield>
+    </sdpi-item>
+    <sdpi-item label="User">
+        <sdpi-textfield setting="cameraUser" global placeholder="root"></sdpi-textfield>
+    </sdpi-item>
+    <sdpi-item label="Password">
+        <sdpi-password setting="cameraPass" global></sdpi-password>
+    </sdpi-item>
+    <sdpi-item label="Protocol">
+        <sdpi-select setting="cameraTls" global default="">
+            <option value="">HTTP (port 80)</option>
+            <option value="1">HTTPS — untrusted cert (port 443)</option>
+        </sdpi-select>
+    </sdpi-item>
+    <sdpi-item label="Guarded Tour">
+        <sdpi-select setting="sel" placeholder="Choose…" datasource="getGuardTours" loading="Loading tours…" show-refresh></sdpi-select>
+    </sdpi-item>
+    <sdpi-item>
+        <small>Enter the camera details (shared across all keys), then pick a Guarded Tour. Tap toggles the tour on/off — the key lights while it runs. Only one tour or PTZ preset is active per view area at a time.</small>
+    </sdpi-item>
+</body>
+</html>

@@ -1,17 +1,13 @@
-import streamDeck, {
-    SingletonAction,
-    type Action,
-    type KeyAction,
-    type JsonObject,
-    type WillAppearEvent,
-    type WillDisappearEvent,
-    type DidReceiveSettingsEvent,
-} from '@elgato/streamdeck';
+import streamDeck, { SingletonAction, type Action, type KeyAction, type WillAppearEvent, type WillDisappearEvent, type DidReceiveSettingsEvent } from '@elgato/streamdeck';
+import type { JsonObject } from '@elgato/utils';
 
 const POLL_MS = 3000;
 // While a start/stop is in flight we poll faster and animate the key so the user
 // gets immediate feedback instead of staring at an unchanged key for ~10s.
 const BLINK_MS = 500;
+// Cadence of the steady "live" blink: toggle the red tally dot on/off while a
+// stream is on air, so the key visibly pulses instead of sitting solid.
+const LIVE_BLINK_MS = 600;
 const PENDING_CHECK_EVERY = 3; // check real state every 3 blinks (~1.5s)
 const PENDING_TIMEOUT_MS = 30000;
 
@@ -42,6 +38,7 @@ export type LiveSettings = {
 export abstract class LiveAction<T extends LiveSettings = LiveSettings> extends SingletonAction<T> {
     private timers = new Map<string, ReturnType<typeof setInterval>>();
     private pending = new Map<string, Pending>();
+    private liveBlink = new Map<string, { timer: ReturnType<typeof setInterval>; lit: boolean }>();
 
     /**
      * Live/active indicator: a solid red tally dot (key state 1). Reliable — no
@@ -49,6 +46,42 @@ export abstract class LiveAction<T extends LiveSettings = LiveSettings> extends 
      */
     protected setLive(action: KeyAction<T>, live: boolean): void {
         void action.setState(live ? 1 : 0);
+    }
+
+    /**
+     * Live indicator with a blinking red tally dot. While {@link live} is true the
+     * key alternates between state 1 (dot on) and state 2 (dot off) so it visibly
+     * pulses on air; when false it stops blinking and shows the idle key (state 0).
+     * Requires manifest states: 1 = dot on, 2 = same key without the dot.
+     */
+    protected setLiveBlinking(action: KeyAction<T>, live: boolean): void {
+        if (!live) {
+            this.stopLiveBlink(action.id);
+            void action.setState(0);
+            return;
+        }
+        // Already blinking — leave the running animation alone (don't restart it
+        // on every poll, which would reset the phase).
+        if (this.liveBlink.has(action.id)) return;
+        void action.setState(1); // dot on immediately
+        const entry: { timer: ReturnType<typeof setInterval>; lit: boolean } = { lit: true, timer: 0 as never };
+        entry.timer = setInterval(() => {
+            entry.lit = !entry.lit;
+            try {
+                void action.setState(entry.lit ? 1 : 2);
+            } catch {
+                /* key may have disappeared */
+            }
+        }, LIVE_BLINK_MS);
+        this.liveBlink.set(action.id, entry);
+    }
+
+    private stopLiveBlink(id: string): void {
+        const e = this.liveBlink.get(id);
+        if (e) {
+            clearInterval(e.timer);
+            this.liveBlink.delete(id);
+        }
     }
 
     /** Paint the key from current gateway state + the action's selection. */
@@ -66,6 +99,7 @@ export abstract class LiveAction<T extends LiveSettings = LiveSettings> extends 
      */
     protected beginPending(action: KeyAction<T>, settings: T, target: boolean): void {
         this.clearPending(action.id);
+        this.stopLiveBlink(action.id); // pending animation owns the key while in flight
         const label = target ? 'Starting' : 'Stopping';
         const p: Pending = { target, label, deadline: Date.now() + PENDING_TIMEOUT_MS, frame: 0, timer: 0 as never };
         p.timer = setInterval(() => void this.pendingTick(action, settings), BLINK_MS);
@@ -112,6 +146,11 @@ export abstract class LiveAction<T extends LiveSettings = LiveSettings> extends 
         }
     }
 
+    /** True while a key is mid start/stop animation — callers should leave it alone. */
+    protected isPending(id: string): boolean {
+        return this.pending.has(id);
+    }
+
     protected clearPending(id: string): void {
         const p = this.pending.get(id);
         if (p) {
@@ -130,6 +169,7 @@ export abstract class LiveAction<T extends LiveSettings = LiveSettings> extends 
     override onWillDisappear(ev: WillDisappearEvent<T>): void {
         this.clear(ev.action.id);
         this.clearPending(ev.action.id);
+        this.stopLiveBlink(ev.action.id);
     }
 
     override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<T>): Promise<void> {

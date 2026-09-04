@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+</head>
+<body>
+    <sdpi-item label="Camera IP">
+        <sdpi-textfield setting="cameraIp" global placeholder="192.168.1.156"></sdpi-textfield>
+    </sdpi-item>
+    <sdpi-item label="User">
+        <sdpi-textfield setting="cameraUser" global placeholder="root"></sdpi-textfield>
+    </sdpi-item>
+    <sdpi-item label="Password">
+        <sdpi-password setting="cameraPass" global></sdpi-password>
+    </sdpi-item>
+    <sdpi-item label="Protocol">
+        <sdpi-select setting="cameraTls" global default="">
+            <option value="">HTTP (port 80)</option>
+            <option value="1">HTTPS — untrusted cert (port 443)</option>
+        </sdpi-select>
+    </sdpi-item>
+    <sdpi-item label="Function">
+        <sdpi-select setting="sel" default='{"action":"cam.autofocus","title":"Autofocus"}'>
+            <option value='{"action":"cam.autofocus","title":"Autofocus"}'>Autofocus (one-push)</option>
+            <option value='{"action":"cam.defog","enabled":"1","title":"Defog On"}'>Defog — On</option>
+            <option value='{"action":"cam.defog","enabled":"0","title":"Defog Off"}'>Defog — Off</option>
+            <option value='{"action":"cam.defog.toggle","title":"Defog"}'>Defog — Toggle (shows ON/OFF)</option>
+            <option value='{"action":"cam.wiper","title":"Wiper"}'>Wiper (timed)</option>
+            <option value='{"action":"cam.ircut","mode":"on","title":"IR Cut On"}'>IR Cut Filter — On (day)</option>
+            <option value='{"action":"cam.ircut","mode":"off","title":"IR Cut Off"}'>IR Cut Filter — Off (night)</option>
+            <option value='{"action":"cam.ircut","mode":"auto","title":"IR Cut Auto"}'>IR Cut Filter — Auto</option>
+        </sdpi-select>
+    </sdpi-item>
+    <sdpi-item id="wiper-item" label="Wiper run" style="display:none">
+        <div style="display:flex; align-items:center; gap:10px; width:100%">
+            <sdpi-range setting="wiperSeconds" min="1" max="30" default="5" step="1" style="flex:1"></sdpi-range>
+            <span id="wiper-val" style="min-width:30px; text-align:right; opacity:.85">5 s</span>
+        </div>
+    </sdpi-item>
+    <sdpi-item>
+        <small>Each tap fires the selected camera-optics command. Autofocus is momentary; Defog and IR Cut set a state (Toggle shows ON/OFF on the key); Wiper runs for the set time with a countdown, then stops. Some commands vary by camera model.</small>
+    </sdpi-item>
+    <script>
+        // Show the "Wiper run" slider only when the Wiper function is selected.
+        function syncWiperVisibility() {
+            const selEl = document.querySelector('sdpi-select[setting="sel"]');
+            const item = document.getElementById('wiper-item');
+            if (!selEl || !item) return;
+            let action = '';
+            try { action = JSON.parse(selEl.value || '{}').action || ''; } catch (e) { /* not ready yet */ }
+            item.style.display = action === 'cam.wiper' ? '' : 'none';
+        }
+        // Show the current slider value in the label, live while dragging.
+        function readWiperValue(range) {
+            if (range.value != null && range.value !== '') return range.value;
+            const inp = (range.shadowRoot && range.shadowRoot.querySelector('input[type=range]'))
+                || range.querySelector('input[type=range]');
+            return inp ? inp.value : null;
+        }
+        function syncWiperLabel() {
+            const range = document.querySelector('sdpi-range[setting="wiperSeconds"]');
+            const out = document.getElementById('wiper-val');
+            if (!range || !out) return;
+            const v = readWiperValue(range);
+            if (v != null && v !== '') out.textContent = `${v} s`;
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const selEl = document.querySelector('sdpi-select[setting="sel"]');
+            if (selEl) selEl.addEventListener('change', syncWiperVisibility);
+            const range = document.querySelector('sdpi-range[setting="wiperSeconds"]');
+            if (range) {
+                range.addEventListener('input', syncWiperLabel);
+                range.addEventListener('change', syncWiperLabel);
+                // Hook the inner native input so the label updates continuously while dragging.
+                const hook = () => {
+                    const inp = range.shadowRoot && range.shadowRoot.querySelector('input[type=range]');
+                    if (inp) { inp.addEventListener('input', syncWiperLabel); return true; }
+                    return false;
+                };
+                if (!hook()) setTimeout(hook, 400);
+            }
+            // sdpi loads stored settings asynchronously — re-check until it settles.
+            const tick = () => { syncWiperVisibility(); syncWiperLabel(); };
+            setTimeout(tick, 300);
+            const t = setInterval(tick, 1000);
+            setTimeout(() => clearInterval(t), 8000);
+        });
+    </script>
+</body>
+</html>

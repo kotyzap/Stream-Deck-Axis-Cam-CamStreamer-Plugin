@@ -1,7 +1,7 @@
 {
     "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
     "Name": "Axis Cam + CamStreamer",
-    "Version": "1.0.0.1",
+    "Version": "1.1.0.0",
     "Author": "Pavel Kotyza",
     "Description": "Control Axis cameras and CamStreamer apps directly: PTZ presets, CamStreamer streams, CamOverlay widgets and CamSwitcher sources — with live key state. https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin",
     "UUID": "com.4xsdev.axis-gateway",
@@ -9,9 +9,9 @@
     "Category": "Axis Cam + CamStreamer",
     "CategoryIcon": "imgs/plugin/category",
     "CodePath": "bin/plugin.js",
-    "SDKVersion": 2,
+    "SDKVersion": 3,
     "Software": {
-        "MinimumVersion": "6.5"
+        "MinimumVersion": "6.9"
     },
     "OS": [
         {
@@ -45,6 +45,28 @@
                 },
                 {
                     "Image": "imgs/actions/preset/key-on",
+                    "TitleAlignment": "middle"
+                }
+            ]
+        },
+        {
+            "Name": "AXIS Guarded Tour",
+            "UUID": "com.4xsdev.axis-gateway.guardtour",
+            "Icon": "imgs/actions/guardtour/icon",
+            "Tooltip": "Start or stop an AXIS Guarded Tour. Shares the PTZ radio group with presets — only one runs per view area. Key reflects live state.",
+            "Controllers": [
+                "Keypad"
+            ],
+            "PropertyInspectorPath": "ui/guardtour.html",
+            "SupportedInMultiActions": true,
+            "DisableAutomaticStates": true,
+            "States": [
+                {
+                    "Image": "imgs/actions/guardtour/key",
+                    "TitleAlignment": "middle"
+                },
+                {
+                    "Image": "imgs/actions/guardtour/key-on",
                     "TitleAlignment": "middle"
                 }
             ]
@@ -114,28 +136,24 @@
                     "TitleAlignment": "middle"
                 },
                 {
-                    "Image": "imgs/actions/view/key-live",
-                    "TitleAlignment": "middle"
-                },
-                {
                     "Image": "imgs/actions/view/key-on",
                     "TitleAlignment": "middle"
                 }
             ]
         },
         {
-            "Name": "Buy Me a Coffee",
-            "UUID": "com.4xsdev.axis-gateway.coffee",
-            "Icon": "imgs/actions/coffee/icon",
-            "Tooltip": "Support development — opens the author's ko-fi page.",
+            "Name": "Cam Control",
+            "UUID": "com.4xsdev.axis-gateway.camcontrol",
+            "Icon": "imgs/actions/camcontrol/icon",
+            "Tooltip": "Camera optics control: autofocus, defog, wiper, IR cut filter.",
             "Controllers": [
                 "Keypad"
             ],
-            "PropertyInspectorPath": "ui/coffee.html",
-            "SupportedInMultiActions": false,
+            "PropertyInspectorPath": "ui/camcontrol.html",
+            "SupportedInMultiActions": true,
             "States": [
                 {
-                    "Image": "imgs/actions/coffee/key",
+                    "Image": "imgs/actions/camcontrol/key",
                     "TitleAlignment": "middle"
                 }
             ]
