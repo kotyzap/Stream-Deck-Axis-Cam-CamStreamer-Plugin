@@ -20,6 +20,9 @@ catalog from the camera (presets, streams, widgets, views) and offers a dropdown
 type a CGI URL. Stream and switcher keys then poll the camera and repaint themselves to show
 what's actually on air.
 
+
+> Two builds of the same plugin (same UUID, either updates the other): the GitHub release adds a **Buy me a Ko-fi** key (`com.4xsdev.axis-gateway-kofi.streamDeckPlugin`); the Elgato Marketplace build (`com.4xsdev.axis-gateway.streamDeckPlugin`) leaves it out, as Marketplace guidelines forbid sponsor links inside plugins.
+
 ## What's new in 1.1.0
 
 - **Elgato Marketplace release.** Manifest moved to SDK v3 (Stream Deck **6.9+**); runtime
@@ -184,3 +187,7 @@ com.4xsdev.axis-gateway.sdPlugin/
   distinguishable when the deck washes the tiles out. The "Buy Me a Coffee" action was removed.
 - **1.0.0** — Initial release: PTZ presets, CamStreamer streams, CamOverlay widgets,
   CamSwitcher sources with live key state.
+
+## Support
+
+Free and open source (MIT). If it saves you clicks, [buy me a Ko-fi](https://ko-fi.com/K3K6RR4LY). Independent project; not affiliated with Axis Communications, CamStreamer or Elgato.

@@ -5,6 +5,7 @@ import { StreamAction } from './actions/stream';
 import { OverlayAction } from './actions/overlay';
 import { ViewAction } from './actions/view';
 import { CamControlAction } from './actions/camcontrol';
+import { KofiAction } from './actions/kofi';
 
 streamDeck.logger.setLevel('info');
 
@@ -14,6 +15,7 @@ streamDeck.actions.registerAction(new StreamAction());
 streamDeck.actions.registerAction(new OverlayAction());
 streamDeck.actions.registerAction(new ViewAction());
 streamDeck.actions.registerAction(new CamControlAction());
+streamDeck.actions.registerAction(new KofiAction());
 
 // Connect LAST, after all actions are registered.
 streamDeck.connect();

@@ -10534,6 +10534,29 @@ let CamControlAction = (() => {
     return _classThis;
 })();
 
+/** Ko-fi — GitHub build only (Marketplace forbids sponsor links inside plugins; package.sh --kofi lists it). */
+let KofiAction = (() => {
+    let _classDecorators = [action({ UUID: 'com.4xsdev.axis-gateway.kofi' })];
+    let _classDescriptor;
+    let _classExtraInitializers = [];
+    let _classThis;
+    let _classSuper = SingletonAction;
+    (class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        onKeyDown() {
+            streamDeck.system.openUrl('https://ko-fi.com/K3K6RR4LY');
+        }
+    });
+    return _classThis;
+})();
+
 streamDeck.logger.setLevel('info');
 streamDeck.actions.registerAction(new PresetAction());
 streamDeck.actions.registerAction(new GuardTourAction());
@@ -10541,5 +10564,6 @@ streamDeck.actions.registerAction(new StreamAction());
 streamDeck.actions.registerAction(new OverlayAction());
 streamDeck.actions.registerAction(new ViewAction());
 streamDeck.actions.registerAction(new CamControlAction());
+streamDeck.actions.registerAction(new KofiAction());
 // Connect LAST, after all actions are registered.
 streamDeck.connect();
