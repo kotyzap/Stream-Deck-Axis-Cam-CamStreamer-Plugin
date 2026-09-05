@@ -1,12 +1,16 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Camera Deck for Axis &amp; CamStreamer</title>
-<meta name="description" content="Stream Deck plugin that controls an Axis camera directly over HTTP: PTZ presets, guarded tours, CamStreamer streams, CamOverlay widgets, CamSwitcher views and camera optics — with live-state keys.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap">
-<style>
+#!/usr/bin/env python3
+"""Generates docs/index.html (GitHub Pages) for Camera Deck for Axis & CamStreamer.
+Uses the repo's existing real screenshots in docs/img. Pavel Kotyza <kotyza@gmail.com> — https://www.4xs.dev
+"""
+import pathlib
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+REPO = "https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin"
+DL = f"{REPO}/releases/latest/download/com.4xsdev.axis-gateway-kofi.streamDeckPlugin"
+
+FONTS = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap">'
+
+CSS = """
 :root{--bg:#f7f5f1;--bg2:#efece6;--fg:#1c1b19;--fg2:#5f5c56;--line:#e0dcd4;--card:#ffffff;--accent:#0e8a7e;--accent-fg:#ffffff;--deck:#1c1c1e}
 :root:not([data-theme=light]) {}
 [data-theme=dark]{--bg:#161615;--bg2:#1f1f1e;--fg:#f2f0ec;--fg2:#a09c94;--line:#2c2b29;--card:#1d1d1c;--accent:#2fd4c4;--accent-fg:#0b1f1c;--deck:#141414}
@@ -58,13 +62,46 @@ td:last-child{color:var(--fg2)}
 footer{padding:36px 0 48px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-size:14px;color:var(--fg2)}
 footer a{color:var(--fg2)}footer a:hover{color:var(--fg)}
 @media (max-width:820px){.hero{grid-template-columns:1fr;padding-top:24px}.hero h1{font-size:38px}.grid3,.two{grid-template-columns:1fr}.navlinks span{display:none}}
-</style>
+"""
+
+GH_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg>'
+DL_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>'
+MARK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.5A2.5 2.5 0 0 1 4.5 6h9A2.5 2.5 0 0 1 16 8.5v7A2.5 2.5 0 0 1 13.5 18h-9A2.5 2.5 0 0 1 2 15.5z"/><path d="M16 10l5-3v10l-5-3"/></svg>'
+
+# Cross-links to the other plugins in the family.
+FAMILY = [
+    ("claude",  "Deck for Claude",                       "Answer permission prompts, replies, shortcuts & status for the Claude desktop app", "https://kotyzap.github.io/Stream-Deck-Claude-Plugin/"),
+    ("axis",    "Camera Deck for Axis &amp; CamStreamer", "PTZ, presets, overlays and CamStreamer/CamSwitcher control for Axis cameras",       "https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin"),
+    ("acs-edge","Deck for AXIS Camera Station Edge",      "Recording playback, PTZ and view controls for ACS Edge",                            "https://kotyzap.github.io/Stream-Deck-ACS-Edge-Plugin/"),
+    ("acs-pro", "Deck for AXIS Camera Station Pro &amp; 5","Playback, cameras, PTZ presets and any hotkey for ACS 5 &amp; Pro",                 "https://kotyzap.github.io/Stream-Deck-ACS-Pro-Plugin/"),
+    ("genetec", "Deck for Genetec Security Desk",         "Playback, alarms, tiles, PTZ, doors and any camera by logical ID for Security Desk", "https://kotyzap.github.io/Stream-Deck-Genetec-Plugin/"),
+]
+def more_cards(self_key):
+    return "\n".join(
+        f'      <a class="card cardlink" href="{url}"><h3>{name} ↗</h3><p>{desc}</p></a>'
+        for key, name, desc, url in FAMILY if key != self_key)
+
+ARCH = ('Stream Deck key ─▶ plugin <span style="color:#a1a1a6">(Node, in the Stream Deck app)</span> ─ HTTP digest ─▶ Axis camera\n'
+        '                                                              ├─ <b>VAPIX PTZ</b>      /axis-cgi/com/ptz.cgi\n'
+        '                                                              ├─ <b>CamStreamer</b>   /local/camstreamer/…\n'
+        '                                                              ├─ <b>CamOverlay</b>    /local/camoverlay/api/…\n'
+        '                                                              └─ <b>CamSwitcher</b>   /local/camswitcher/…')
+
+HTML = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Camera Deck for Axis &amp; CamStreamer</title>
+<meta name="description" content="Stream Deck plugin that controls an Axis camera directly over HTTP: PTZ presets, guarded tours, CamStreamer streams, CamOverlay widgets, CamSwitcher views and camera optics — with live-state keys.">
+{FONTS}
+<style>{CSS}</style>
 </head>
 <body>
 <div class="wrap">
   <nav>
-    <a class="brand" href="#"><span class="mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.5A2.5 2.5 0 0 1 4.5 6h9A2.5 2.5 0 0 1 16 8.5v7A2.5 2.5 0 0 1 13.5 18h-9A2.5 2.5 0 0 1 2 15.5z"/><path d="M16 10l5-3v10l-5-3"/></svg></span><span>Camera Deck for Axis &amp; CamStreamer</span></a>
-    <div class="navlinks"><a href="#actions">Actions</a><a href="#how">How it works</a><a href="#decks">Decks</a><a href="#install">Install</a><a href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a><button class="toggle" id="theme" aria-label="Toggle dark mode" onclick="toggleTheme()"></button></div>
+    <a class="brand" href="#"><span class="mark">{MARK}</span><span>Camera Deck for Axis &amp; CamStreamer</span></a>
+    <div class="navlinks"><a href="#actions">Actions</a><a href="#how">How it works</a><a href="#decks">Decks</a><a href="#install">Install</a><a href="{REPO}">{GH_ICON}</a><button class="toggle" id="theme" aria-label="Toggle dark mode" onclick="toggleTheme()"></button></div>
   </nav>
 
   <div class="hero">
@@ -72,8 +109,8 @@ footer a{color:var(--fg2)}footer a:hover{color:var(--fg)}
       <h1>Your Axis camera on physical keys.</h1>
       <p>PTZ presets, guarded tours, CamStreamer streams, CamOverlay widgets, CamSwitcher views and camera optics — on a Stream Deck. The plugin talks straight to the camera; every key reads the live catalog and repaints itself to show what's actually on air.</p>
       <div class="cta">
-        <a class="btn" href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin/releases/latest/download/com.4xsdev.axis-gateway-kofi.streamDeckPlugin"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Download plugin</a>
-        <a class="btn ghost" href="https://github.com/kotyzap/Stream-Deck-Axis-Cam-CamStreamer-Plugin">Source on GitHub</a>
+        <a class="btn" href="{DL}">{DL_ICON}Download plugin</a>
+        <a class="btn ghost" href="{REPO}">Source on GitHub</a>
       </div>
       <p class="meta" style="margin-top:16px">Windows 10+ · macOS 12+ · Stream Deck 6.9+. Free and open source (MIT). No cloud, no extra software — just the camera's IP and login.</p>
     </div>
@@ -99,11 +136,7 @@ footer a{color:var(--fg2)}footer a:hover{color:var(--fg)}
     <div class="eyebrow">How it works</div>
     <h2>Straight to the camera.</h2>
     <p class="lead">No cloud and no middle-man service — the plugin speaks the camera's own HTTP APIs over digest authentication on your LAN. The camera is the single source of truth.</p>
-    <div class="arch">Stream Deck key ─▶ plugin <span style="color:#a1a1a6">(Node, in the Stream Deck app)</span> ─ HTTP digest ─▶ Axis camera
-                                                              ├─ <b>VAPIX PTZ</b>      /axis-cgi/com/ptz.cgi
-                                                              ├─ <b>CamStreamer</b>   /local/camstreamer/…
-                                                              ├─ <b>CamOverlay</b>    /local/camoverlay/api/…
-                                                              └─ <b>CamSwitcher</b>   /local/camswitcher/…</div>
+    <div class="arch">{ARCH}</div>
     <p class="meta" style="margin-top:16px">Credentials live in Stream Deck's settings; a per-key override lets a profile bake in a specific camera. Commands don't retry on a 401, so a wrong password won't trip the camera's auth firewall. Works on AXIS OS 10 through 12.</p>
   </section>
 
@@ -133,10 +166,7 @@ footer a{color:var(--fg2)}footer a:hover{color:var(--fg)}
     <h2>Other Stream Deck plugins.</h2>
     <p class="lead">Physical keys for the tools you already use. All free and open source.</p>
     <div class="grid3">
-      <a class="card cardlink" href="https://kotyzap.github.io/Stream-Deck-Claude-Plugin/"><h3>Deck for Claude ↗</h3><p>Answer permission prompts, replies, shortcuts & status for the Claude desktop app</p></a>
-      <a class="card cardlink" href="https://kotyzap.github.io/Stream-Deck-ACS-Edge-Plugin/"><h3>Deck for AXIS Camera Station Edge ↗</h3><p>Recording playback, PTZ and view controls for ACS Edge</p></a>
-      <a class="card cardlink" href="https://kotyzap.github.io/Stream-Deck-ACS-Pro-Plugin/"><h3>Deck for AXIS Camera Station Pro &amp; 5 ↗</h3><p>Playback, cameras, PTZ presets and any hotkey for ACS 5 &amp; Pro</p></a>
-      <a class="card cardlink" href="https://kotyzap.github.io/Stream-Deck-Genetec-Plugin/"><h3>Deck for Genetec Security Desk ↗</h3><p>Playback, alarms, tiles, PTZ, doors and any camera by logical ID for Security Desk</p></a>
+{more_cards("axis")}
     </div>
   </section>
 
@@ -146,12 +176,18 @@ footer a{color:var(--fg2)}footer a:hover{color:var(--fg)}
   </footer>
 </div>
 <script>
-(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}
+(function(){{var t=null;try{{t=localStorage.getItem('theme')}}catch(e){{}}
 if(!t&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)t='dark';
-if(t==='dark')document.documentElement.setAttribute('data-theme','dark');})();
-function toggleTheme(){var r=document.documentElement,d=r.getAttribute('data-theme')==='dark';
+if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}})();
+function toggleTheme(){{var r=document.documentElement,d=r.getAttribute('data-theme')==='dark';
 if(d)r.removeAttribute('data-theme');else r.setAttribute('data-theme','dark');
-try{localStorage.setItem('theme',d?'light':'dark')}catch(e){}}
+try{{localStorage.setItem('theme',d?'light':'dark')}}catch(e){{}}}}
 </script>
 </body>
 </html>
+"""
+
+if __name__ == "__main__":
+    (ROOT / "docs").mkdir(exist_ok=True)
+    (ROOT / "docs" / "index.html").write_text(HTML)
+    print("wrote", ROOT / "docs" / "index.html", len(HTML), "bytes")
