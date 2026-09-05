@@ -75,6 +75,7 @@ FAMILY = [
     ("acs-edge","Deck for AXIS Camera Station Edge",      "Recording playback, PTZ and view controls for ACS Edge",                            "https://kotyzap.github.io/Stream-Deck-ACS-Edge-Plugin/"),
     ("acs-pro", "Deck for AXIS Camera Station Pro &amp; 5","Playback, cameras, PTZ presets and any hotkey for ACS 5 &amp; Pro",                 "https://kotyzap.github.io/Stream-Deck-ACS-Pro-Plugin/"),
     ("genetec", "Deck for Genetec Security Desk",         "Playback, alarms, tiles, PTZ, doors and any camera by logical ID for Security Desk", "https://kotyzap.github.io/Stream-Deck-Genetec-Plugin/"),
+    ("milestone","Deck for Milestone XProtect",          "Playback, evidence, PTZ, views and any camera or view by number for XProtect Smart Client", "https://kotyzap.github.io/Stream-Deck-Milestone-Plugin/"),
 ]
 def more_cards(self_key):
     return "\n".join(
